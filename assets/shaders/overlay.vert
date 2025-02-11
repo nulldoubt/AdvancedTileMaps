@@ -5,7 +5,6 @@ in vec2 a_texCoord0;
 uniform mat4 u_projTrans;
 
 out vec4 v_color;
-out vec4 v_mixColor;
 out vec2 v_texCoords;
 out vec2 v_worldPosition;
 

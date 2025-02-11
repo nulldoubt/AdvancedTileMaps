@@ -118,7 +118,8 @@ public class AdvancedTileMaps extends ApplicationAdapter {
         batch = new SpriteBatch();
 
         // creating our viewport, with our world bounds being of the same aspect-ratio of our native resolution.
-        viewport = new StretchViewport(16f, 9f);
+        viewport = new FitViewport(40f, 22.5f);
+        ((OrthographicCamera) viewport.getCamera()).zoom = 1f / 2.5f;
 
         // initializing our dirt tile layer.
         dirtLayer = new TileLayer(new TextureRegion(dirt), dirtOverlay, shader, 64, 64, 16f, 16f, 1f / 16f);

@@ -15,7 +15,7 @@ public class TileLayer {
     private static final GridPoint2[] neighbors;
 
     static {
-        conversions = new IntMap<>();
+        conversions = new IntMap<>(16);
         conversions.put(0b1111, (byte) 6);
         conversions.put(0b0001, (byte) 13);
         conversions.put(0b0010, (byte) 0);
