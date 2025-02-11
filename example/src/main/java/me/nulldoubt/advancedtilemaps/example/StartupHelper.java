@@ -14,7 +14,7 @@
  */
 //Note, the above license and copyright applies to this file only.
 
-package me.nulldoubt.advancedtilemaps.lwjgl3;
+package me.nulldoubt.advancedtilemaps.example;
 
 import org.lwjgl.system.macosx.LibC;
 
@@ -31,6 +31,7 @@ import java.util.ArrayList;
  * outside the Latin alphabet, a common cause of startup crashes.
  * <br>
  * <a href="https://jvm-gaming.org/t/starting-jvm-on-mac-with-xstartonfirstthread-programmatically/57547">Based on this java-gaming.org post by kappa</a>
+ *
  * @author damios
  */
 public class StartupHelper {
@@ -58,12 +59,11 @@ public class StartupHelper {
      * }
      * </code></pre>
      *
-     * @param redirectOutput
-     *            whether the output of the new JVM should be rerouted to the
-     *            old JVM, so it can be accessed in the same place; keeps the
-     *            old JVM running if enabled
+     * @param redirectOutput whether the output of the new JVM should be rerouted to the
+     *                       old JVM, so it can be accessed in the same place; keeps the
+     *                       old JVM running if enabled
      * @return whether a new JVM was started and thus no code should be executed
-     *         in this one
+     * in this one
      */
     public static boolean startNewJvmIfRequired(boolean redirectOutput) {
         String osName = System.getProperty("os.name").toLowerCase();
@@ -94,7 +94,7 @@ public class StartupHelper {
         // avoids looping, but most certainly leads to a crash
         if ("true".equals(System.getProperty(JVM_RESTARTED_ARG))) {
             System.err.println(
-                    "There was a problem evaluating whether the JVM was started with the -XstartOnFirstThread argument.");
+                "There was a problem evaluating whether the JVM was started with the -XstartOnFirstThread argument.");
             return false;
         }
 
@@ -108,7 +108,7 @@ public class StartupHelper {
 
         if (!(new File(javaExecPath)).exists()) {
             System.err.println(
-                    "A Java installation could not be found. If you are distributing this app with a bundled JRE, be sure to set the -XstartOnFirstThread argument manually!");
+                "A Java installation could not be found. If you are distributing this app with a bundled JRE, be sure to set the -XstartOnFirstThread argument manually!");
             return false;
         }
 
@@ -136,9 +136,9 @@ public class StartupHelper {
                 processBuilder.start();
             } else {
                 Process process = (new ProcessBuilder(jvmArgs))
-                        .redirectErrorStream(true).start();
+                    .redirectErrorStream(true).start();
                 BufferedReader processOutput = new BufferedReader(
-                        new InputStreamReader(process.getInputStream()));
+                    new InputStreamReader(process.getInputStream()));
                 String line;
 
                 while ((line = processOutput.readLine()) != null) {
@@ -171,7 +171,7 @@ public class StartupHelper {
      * </pre>
      *
      * @return whether a new JVM was started and thus no code should be executed
-     *         in this one
+     * in this one
      */
     public static boolean startNewJvmIfRequired() {
         return startNewJvmIfRequired(true);

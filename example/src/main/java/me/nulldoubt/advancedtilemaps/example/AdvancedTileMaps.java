@@ -1,4 +1,4 @@
-package me.nulldoubt.advancedtilemaps;
+package me.nulldoubt.advancedtilemaps.example;
 
 import com.badlogic.gdx.ApplicationAdapter;
 import com.badlogic.gdx.Gdx;
@@ -15,6 +15,7 @@ import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.utils.ScreenUtils;
 import com.badlogic.gdx.utils.viewport.*;
+import me.nulldoubt.advancedtilemaps.TileLayer;
 
 public class AdvancedTileMaps extends ApplicationAdapter {
 

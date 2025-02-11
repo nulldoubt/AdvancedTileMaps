@@ -7,6 +7,8 @@ gradle-app.setting
 /core/build/
 /lwjgl2/build/
 /lwjgl3/build/
+/example/build/
+/library/build/
 /html/build/
 /teavm/build/
 /ios/build/
@@ -63,6 +65,7 @@ www-test/
 *.iml
 *.ipr
 out/
+.editorconfig
 !**/src/main/**/out/
 !**/src/test/**/out/
 

@@ -1,13 +1,12 @@
-package me.nulldoubt.advancedtilemaps.lwjgl3;
+package me.nulldoubt.advancedtilemaps.example;
 
 import com.badlogic.gdx.backends.lwjgl3.Lwjgl3Application;
 import com.badlogic.gdx.backends.lwjgl3.Lwjgl3ApplicationConfiguration;
-import me.nulldoubt.advancedtilemaps.AdvancedTileMaps;
 
 /**
- * Launches the desktop (LWJGL3) application.
+ * Launches the desktop example application.
  */
-public class Lwjgl3Launcher {
+public class ExampleLauncher {
 
     public static void main(String[] args) {
         if (StartupHelper.startNewJvmIfRequired())
@@ -27,4 +26,5 @@ public class Lwjgl3Launcher {
         configuration.setWindowedMode(800, 450);
         return configuration;
     }
+
 }
