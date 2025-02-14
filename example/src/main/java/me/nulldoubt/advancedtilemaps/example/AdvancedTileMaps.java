@@ -146,7 +146,8 @@ public class AdvancedTileMaps extends ApplicationAdapter {
 
             @Override
             public boolean scrolled(float amountX, float amountY) {
-                targetZoom = ((OrthographicCamera) viewport.getCamera()).zoom + (amountY * 0.5f);
+                targetZoom += (amountY * 0.5f);
+                targetZoom = MathUtils.clamp(targetZoom, 0.1f, 1.5f);
                 return true;
             }
 
@@ -192,7 +193,6 @@ public class AdvancedTileMaps extends ApplicationAdapter {
 
         if (targetZoom != camera.zoom)
             camera.zoom = MathUtils.lerp(camera.zoom, targetZoom, delta * zoomSpeed);
-        camera.zoom = MathUtils.clamp(camera.zoom, 0.1f, 1.5f);
 
         final float width = (viewport.getWorldWidth() / 2f) * camera.zoom;
         final float height = (viewport.getWorldHeight() / 2f) * camera.zoom;
