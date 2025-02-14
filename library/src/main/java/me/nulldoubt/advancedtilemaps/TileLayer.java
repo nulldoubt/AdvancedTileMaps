@@ -1,10 +1,12 @@
 package me.nulldoubt.advancedtilemaps;
 
+import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.Batch;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.graphics.glutils.ShaderProgram;
 import com.badlogic.gdx.math.GridPoint2;
+import com.badlogic.gdx.math.Rectangle;
 import com.badlogic.gdx.utils.IntMap;
 
 import java.util.Arrays;
@@ -56,6 +58,7 @@ public class TileLayer {
     }
 
     private final TextureRegion[] tileSet;
+    private final Rectangle viewBounds;
     private Texture texture;
 
     private Texture overlayTexture;
@@ -76,6 +79,7 @@ public class TileLayer {
 
     private final boolean[][] tiles;
     private final byte[][] indices;
+    private int tilesRendered;
 
     public TileLayer(int tilesX, int tilesY, float tileWidth, float tileHeight, float unitScale, boolean fill) {
         this.tilesX = tilesX;
@@ -91,6 +95,8 @@ public class TileLayer {
         indices = new byte[tilesX][tilesY];
 
         tileSet = new TextureRegion[16];
+        viewBounds = new Rectangle();
+
         fill(fill);
     }
 
@@ -179,6 +185,14 @@ public class TileLayer {
             }
     }
 
+    public Rectangle getViewBounds() {
+        return viewBounds;
+    }
+
+    public int getTilesRendered() {
+        return tilesRendered;
+    }
+
     public void fill(boolean state) {
         for (final boolean[] row : tiles)
             Arrays.fill(row, state);
@@ -216,6 +230,20 @@ public class TileLayer {
         }
     }
 
+    /* May be called before rendering! */
+    public void setView(OrthographicCamera camera) {
+        float width = camera.viewportWidth * camera.zoom;
+        float height = camera.viewportHeight * camera.zoom;
+        float w = width * Math.abs(camera.up.y) + height * Math.abs(camera.up.x);
+        float h = height * Math.abs(camera.up.y) + width * Math.abs(camera.up.x);
+        viewBounds.set(camera.position.x - w / 2, camera.position.y - h / 2, w, h);
+    }
+
+    /* May be called before rendering! */
+    public void setView(float x, float y, float width, float height) {
+        viewBounds.set(x, y, width, height);
+    }
+
     public void render(final Batch batch) {
         if (texture == null)
             return;
@@ -230,12 +258,30 @@ public class TileLayer {
             batch.setShader(overlayShaderProgram);
         }
 
-        for (int x = 0; x < tilesX; x++)
-            for (int y = 0; y < tilesY; y++)
-                batch.draw(tileSet[indices[x][y]], (offsetX + x * tileWidth) * unitScale, (offsetY + y * tileHeight) * unitScale, tileWidth * unitScale, tileHeight * unitScale);
-        
+        renderTiles(batch);
+
         if (overlayed)
             batch.setShader(null);
+    }
+
+    private void renderTiles(Batch batch) {
+
+        int col1 = Math.max(0, (int) ((viewBounds.x - offsetX) / (tileWidth * unitScale)));
+        int col2 = Math.min(tilesX, (int) ((viewBounds.x + viewBounds.width) / (tileWidth * unitScale)) + 1);
+
+        int row1 = Math.max(0, (int) ((viewBounds.y - offsetY) / (tileHeight * unitScale)));
+        int row2 = Math.min(tilesY, (int) ((viewBounds.y + viewBounds.height) / (tileHeight * unitScale)) + 1);
+
+        tilesRendered = 0;
+        for (int x = col1; x < col2; x++) {
+            for (int y = row1; y < row2; y++) {
+                tilesRendered++;
+                batch.draw(tileSet[indices[x][y]],
+                    (offsetX + x * tileWidth) * unitScale,
+                    (offsetY + y * tileHeight) * unitScale,
+                    tileWidth * unitScale, tileHeight * unitScale);
+            }
+        }
     }
 
 }

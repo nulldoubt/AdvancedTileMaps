@@ -202,10 +202,16 @@ public class AdvancedTileMaps extends ApplicationAdapter {
             rendering plays a huge role, and it's up to
             you to manage it properly.
          */
+        dirtLayer.setView(camera);
         dirtLayer.render(batch); // first comes the dirt.
+
+        grassLayer.setView(camera);
         grassLayer.render(batch); // then comes the grass.
 
         batch.end(); // end the batch.
+
+        // We'd like to know how many tiles we rendered!
+        System.out.printf("\rDirt tiles rendered: %03d", dirtLayer.getTilesRendered());
     }
 
     @Override
