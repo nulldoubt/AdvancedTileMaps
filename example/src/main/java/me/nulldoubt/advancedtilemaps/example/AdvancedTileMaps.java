@@ -85,6 +85,9 @@ public class AdvancedTileMaps extends ApplicationAdapter {
     private final Vector2 cameraVelocity = new Vector2();
     private final float cameraSpeed = 21f; // in world-units-per-second.
 
+    private float targetZoom;
+    private float zoomSpeed = 21f;
+
     private boolean _touchDown;
     private boolean _buttonRight;
 
@@ -126,7 +129,7 @@ public class AdvancedTileMaps extends ApplicationAdapter {
 
         // creating our viewport, with our world bounds being of the same aspect-ratio of our native resolution.
         viewport = new FitViewport(40f, 22.5f);
-        ((OrthographicCamera) viewport.getCamera()).zoom = 1f / 2.5f;
+        ((OrthographicCamera) viewport.getCamera()).zoom = targetZoom = 1f / 2.5f;
 
         // initializing our dirt tile layer.
         dirtLayer = new TileLayer(64, 64, 16f, 16f, 1f / 16f, true);
@@ -140,6 +143,12 @@ public class AdvancedTileMaps extends ApplicationAdapter {
 
         // setting the default input processor.
         Gdx.input.setInputProcessor(new InputAdapter() {
+
+            @Override
+            public boolean scrolled(float amountX, float amountY) {
+                targetZoom = ((OrthographicCamera) viewport.getCamera()).zoom + (amountY * 0.5f);
+                return true;
+            }
 
             @Override
             public boolean touchDragged(int screenX, int screenY, int pointer) {
@@ -179,8 +188,14 @@ public class AdvancedTileMaps extends ApplicationAdapter {
         ScreenUtils.clear(Color.BLACK); // clear the screen.
 
         final OrthographicCamera camera = (OrthographicCamera) viewport.getCamera();
-        final float width = (viewport.getWorldWidth() / 2f);
-        final float height = (viewport.getWorldHeight() / 2f);
+        final float delta = Gdx.graphics.getDeltaTime();
+
+        if (targetZoom != camera.zoom)
+            camera.zoom = MathUtils.lerp(camera.zoom, targetZoom, delta * zoomSpeed);
+        camera.zoom = MathUtils.clamp(camera.zoom, 0.1f, 1.5f);
+
+        final float width = (viewport.getWorldWidth() / 2f) * camera.zoom;
+        final float height = (viewport.getWorldHeight() / 2f) * camera.zoom;
 
         if (Gdx.input.isKeyPressed(Input.Keys.W))
             cameraVelocity.y++;
@@ -194,7 +209,6 @@ public class AdvancedTileMaps extends ApplicationAdapter {
         if (length > 1f)
             cameraVelocity.nor();
 
-        final float delta = Gdx.graphics.getDeltaTime();
         camera.position.x += cameraVelocity.x * cameraSpeed * delta;
         camera.position.y += cameraVelocity.y * cameraSpeed * delta;
         cameraVelocity.setZero();
