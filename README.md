@@ -80,11 +80,70 @@ actually, the camera is what we see. When you set the
 camera zoom to 1.0, then you see the whole viewport. 
 *And don't worry, your world may be bigger than the viewport!*
 
+How to use the library?
+---
+The library consists of a single, configurable class `TileLayer`.
+
+First, you have to create an instance of that class, 
+using this constructor:
+```java
+new TileLayer(
+        int tilesX,         // width of the world in tiles
+        int tilesY,         // height of the world in tiles
+        float tileWidth,    // tile width
+        float tileHeight,   // tile height
+        float unitScale,    // unit-scale of the world
+        boolean fill        // initial-state of this layer (should it be empty, or filled?)
+);
+```
+and when you have an instance, you should immediately set the tile-set:
+```java
+tileLayer.setTileSet(textureRegion);
+```
+and, optionally, if you'd like to integrate an overlay into the 
+tileLayer, then you can use this method:
+```java
+tileLayer.setOverlay(overlayTexture, overlayShader);
+```
+
+So, now you've finally configured a tile layer, what next?
+In your render pipeline, you'll be able to render the 
+tileLayer using this snippet:
+```java
+tileLayer.setView(camera); // We set the view-bounds to the camera (see overloaded methods).
+tileLayer.render(batch); // We render using an instance of a batch.
+```
+
+If you're facing any issues with texture-bleeding, then 
+this library has gotten your back! Play a bit using the 
+`TileLayer.setInsetTolerance(float, float)` method and find 
+the sweet spot for your texture. Depending on your texture 
+size, the inset tolerance should be between 
+`0.001 (>= 4096 pixels)` and `0.05 (<= 16 pixels)`.
+
+If you have a different tile-set layout than the default 
+one (as seen in the example), then you can use the 
+`TileLayer.setAutoTileConfiguration(IntMap<Byte>)` method 
+to provide a custom auto-tile index-mapping. **Note that, 
+as of now, this is a static property and it will modify 
+the configuration of all tile layers.**
+
+You can check out the `TileLayer` class and its methods, 
+there are many nice methods that allow you to customize 
+it to your liking and also some getters and setters amongst 
+other utility methods.
+
+If you're having trouble with something, or would like to 
+report a bug, request a feature, request an optimization, or 
+anything else, then open an issue here on GitHub.
+
+Also, contributions are welcome!
+
 How to run the example?
 ---
 It's really simple, just clone the repository and run 
 it using the gradle-wrapper. Using this command:
-```
+```shell
 ./gradlew clean :example:run
 ```
 
@@ -92,7 +151,7 @@ How to build the library?
 ---
 Building is simple as well, clone the repository and 
 build the jar file using the gradle-wrapper. Using this command: 
-```
+```shell
 ./gradlew clean :library:jar
 ```
 
@@ -105,10 +164,8 @@ I will try my best to maintain this library and fix future
 bugs, maybe even implement features and optimize it. Pull 
 requests are very welcome.
 
-A simple note: As of now, there are many simple, possible 
-optimizations for the `TileLayer` class. Keep in mind that 
-this is the first draft of the library, so you may find it 
-unoptimized at first.
+As of now, the TileLayer class is pretty optimized. It can handle 
+large worlds efficiently.
 
 License?
 ---
