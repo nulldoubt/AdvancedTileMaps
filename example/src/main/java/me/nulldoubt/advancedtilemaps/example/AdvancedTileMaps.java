@@ -82,6 +82,9 @@ public class AdvancedTileMaps extends ApplicationAdapter {
      */
     private Viewport viewport;
 
+    private boolean _touchDown;
+    private boolean _buttonRight;
+
     @Override
     public void create() {
 
@@ -148,27 +151,30 @@ public class AdvancedTileMaps extends ApplicationAdapter {
             }
 
             @Override
-            public boolean touchDragged(final int screenX, final int screenY, final int pointer) {
+            public boolean touchDragged(int screenX, int screenY, int pointer) {
+                if (!_touchDown)
+                    return false;
                 final Vector2 touch = viewport.unproject(temp.set(screenX, screenY));
                 grassLayer.tileAt(
                     (int) (touch.x - 1f),
                     (int) (touch.y - 1f),
-                    Gdx.input.isButtonPressed(Input.Buttons.LEFT)
+                    !_buttonRight
                 );
                 return true;
             }
 
             @Override
             public boolean touchDown(final int screenX, final int screenY, final int pointer, final int button) {
-                final Vector2 touch = viewport.unproject(temp.set(screenX, screenY));
-                grassLayer.tileAt(
-                    (int) (touch.x - 1f),
-                    (int) (touch.y - 1f),
-                    button == Input.Buttons.LEFT
-                );
-                return true;
+                _buttonRight = (button == Input.Buttons.RIGHT);
+                return (_touchDown = true);
             }
 
+            @Override
+            public boolean touchUp(int screenX, int screenY, int pointer, int button) {
+                boolean b = _touchDown;
+                _touchDown = false;
+                return b;
+            }
         });
     }
 
