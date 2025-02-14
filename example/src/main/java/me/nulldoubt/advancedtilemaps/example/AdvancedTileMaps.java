@@ -82,6 +82,9 @@ public class AdvancedTileMaps extends ApplicationAdapter {
      */
     private Viewport viewport;
 
+    private final Vector2 cameraVelocity = new Vector2();
+    private final float cameraSpeed = 21f; // in world-units-per-second.
+
     private boolean _touchDown;
     private boolean _buttonRight;
 
@@ -139,33 +142,17 @@ public class AdvancedTileMaps extends ApplicationAdapter {
         Gdx.input.setInputProcessor(new InputAdapter() {
 
             @Override
-            public boolean keyDown(final int keycode) {
-                switch (keycode) {
-                    case Input.Keys.W -> viewport.getCamera().position.y++;
-                    case Input.Keys.A -> viewport.getCamera().position.x--;
-                    case Input.Keys.S -> viewport.getCamera().position.y--;
-                    case Input.Keys.D -> viewport.getCamera().position.x++;
-                    default -> {}
-                }
-                return true;
-            }
-
-            @Override
             public boolean touchDragged(int screenX, int screenY, int pointer) {
                 if (!_touchDown)
                     return false;
-                final Vector2 touch = viewport.unproject(temp.set(screenX, screenY));
-                grassLayer.tileAt(
-                    (int) (touch.x - 1f),
-                    (int) (touch.y - 1f),
-                    !_buttonRight
-                );
+                handleTile(screenX, screenY);
                 return true;
             }
 
             @Override
             public boolean touchDown(final int screenX, final int screenY, final int pointer, final int button) {
                 _buttonRight = (button == Input.Buttons.RIGHT);
+                handleTile(screenX, screenY);
                 return (_touchDown = true);
             }
 
@@ -178,6 +165,15 @@ public class AdvancedTileMaps extends ApplicationAdapter {
         });
     }
 
+    private void handleTile(int screenX, int screenY) {
+        final Vector2 touch = viewport.unproject(temp.set(screenX, screenY));
+        grassLayer.tileAt(
+            (int) (touch.x - 1f),
+            (int) (touch.y - 1f),
+            !_buttonRight
+        );
+    }
+
     @Override
     public void render() {
         ScreenUtils.clear(Color.BLACK); // clear the screen.
@@ -185,6 +181,23 @@ public class AdvancedTileMaps extends ApplicationAdapter {
         final OrthographicCamera camera = (OrthographicCamera) viewport.getCamera();
         final float width = (viewport.getWorldWidth() / 2f);
         final float height = (viewport.getWorldHeight() / 2f);
+
+        if (Gdx.input.isKeyPressed(Input.Keys.W))
+            cameraVelocity.y++;
+        if (Gdx.input.isKeyPressed(Input.Keys.A))
+            cameraVelocity.x--;
+        if (Gdx.input.isKeyPressed(Input.Keys.S))
+            cameraVelocity.y--;
+        if (Gdx.input.isKeyPressed(Input.Keys.D))
+            cameraVelocity.x++;
+        float length = cameraVelocity.len();
+        if (length > 1f)
+            cameraVelocity.nor();
+
+        final float delta = Gdx.graphics.getDeltaTime();
+        camera.position.x += cameraVelocity.x * cameraSpeed * delta;
+        camera.position.y += cameraVelocity.y * cameraSpeed * delta;
+        cameraVelocity.setZero();
 
         // here, we clamp the camera position to our world boundaries.
         camera.position.set(
@@ -198,6 +211,10 @@ public class AdvancedTileMaps extends ApplicationAdapter {
             layers to use a unit-scale, then apply your viewport here!
          */
         viewport.apply();
+
+        // When the camera moves, and we're dragging, then tiles should be set!
+        if (length > 0.01f && _touchDown)
+            handleTile(Gdx.input.getX(), Gdx.input.getY());
 
         // setting the viewport camera projection matrix.
         batch.setProjectionMatrix(camera.combined);
