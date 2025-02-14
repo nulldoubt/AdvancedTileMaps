@@ -11,97 +11,178 @@ import java.util.Arrays;
 
 public class TileLayer {
 
-    private static final IntMap<Byte> conversions;
+    private static final IntMap<Byte> configuration;
     private static final GridPoint2[] neighbors;
+    private static float insetToleranceX;
+    private static float insetToleranceY;
 
     static {
-        conversions = new IntMap<>(16);
-        conversions.put(0b1111, (byte) 6);
-        conversions.put(0b0001, (byte) 13);
-        conversions.put(0b0010, (byte) 0);
-        conversions.put(0b0100, (byte) 8);
-        conversions.put(0b1000, (byte) 15);
-        conversions.put(0b0101, (byte) 1);
-        conversions.put(0b1010, (byte) 11);
-        conversions.put(0b0011, (byte) 3);
-        conversions.put(0b1100, (byte) 9);
-        conversions.put(0b0111, (byte) 5);
-        conversions.put(0b1011, (byte) 2);
-        conversions.put(0b1101, (byte) 10);
-        conversions.put(0b1110, (byte) 7);
-        conversions.put(0b0110, (byte) 14);
-        conversions.put(0b1001, (byte) 4);
-        conversions.put(0b0000, (byte) 12);
+        configuration = new IntMap<>(16);
+        configuration.put(0b1111, (byte) 6);
+        configuration.put(0b0001, (byte) 13);
+        configuration.put(0b0010, (byte) 0);
+        configuration.put(0b0100, (byte) 8);
+        configuration.put(0b1000, (byte) 15);
+        configuration.put(0b0101, (byte) 1);
+        configuration.put(0b1010, (byte) 11);
+        configuration.put(0b0011, (byte) 3);
+        configuration.put(0b1100, (byte) 9);
+        configuration.put(0b0111, (byte) 5);
+        configuration.put(0b1011, (byte) 2);
+        configuration.put(0b1101, (byte) 10);
+        configuration.put(0b1110, (byte) 7);
+        configuration.put(0b0110, (byte) 14);
+        configuration.put(0b1001, (byte) 4);
+        configuration.put(0b0000, (byte) 12);
 
         neighbors = new GridPoint2[]{
             new GridPoint2(0, 0), new GridPoint2(1, 0),
             new GridPoint2(0, 1), new GridPoint2(1, 1)
         };
+
+        insetToleranceX = 0.01f;
+        insetToleranceY = 0.01f;
+    }
+
+    public static void setAutoTileConfiguration(IntMap<Byte> configuration) {
+        TileLayer.configuration.clear(16);
+        TileLayer.configuration.putAll(configuration);
+    }
+
+    /* Re-set your tileSet after using this! */
+    public static void setInsetTolerance(float insetToleranceX, float insetToleranceY) {
+        TileLayer.insetToleranceX = insetToleranceX;
+        TileLayer.insetToleranceY = insetToleranceY;
     }
 
     private final TextureRegion[] tileSet;
+    private Texture texture;
 
-    private final Texture texture;
-    private final Texture overlay;
-    private final ShaderProgram shader;
+    private Texture overlayTexture;
+    private ShaderProgram overlayShaderProgram;
+    private boolean overlayed;
 
-    public final int tilesX;
-    public final int tilesY;
+    private final int tilesX;
+    private final int tilesY;
 
-    public final float tileWidth;
-    public final float tileHeight;
+    private final float tileWidth;
+    private final float tileHeight;
 
-    public final float offsetX;
-    public final float offsetY;
+    private final float offsetX;
+    private final float offsetY;
 
-    public float overlayScale;
-    public float unitScale;
+    private float overlayScale;
+    private float unitScale;
 
     private final boolean[][] tiles;
     private final byte[][] indices;
 
-    public TileLayer(final TextureRegion tileSet, final Texture overlay, final ShaderProgram shader, final int tilesX, final int tilesY, final float tileWidth, final float tileHeight, final float unitScale) {
-        this.texture = tileSet.getTexture();
-        this.overlay = overlay;
-        this.shader = shader;
-
+    public TileLayer(int tilesX, int tilesY, float tileWidth, float tileHeight, float unitScale, boolean fill) {
         this.tilesX = tilesX;
         this.tilesY = tilesY;
         this.tileWidth = tileWidth;
         this.tileHeight = tileHeight;
+        this.unitScale = unitScale;
 
         offsetX = tileWidth / 2f;
         offsetY = tileHeight / 2f;
 
-        overlayScale = 1f / overlay.getWidth();
-        this.unitScale = unitScale;
-
         tiles = new boolean[tilesX][tilesY];
         indices = new byte[tilesX][tilesY];
 
-        this.tileSet = new TextureRegion[16];
-        final Texture texture = tileSet.getTexture();
-        final float tileSetU = tileSet.getU();
-        final float tileSetV = tileSet.getV();
+        tileSet = new TextureRegion[16];
+        fill(fill);
+    }
+
+    public int getTilesX() {
+        return tilesX;
+    }
+
+    public int getTilesY() {
+        return tilesY;
+    }
+
+    public float getTileWidth() {
+        return tileWidth;
+    }
+
+    public float getTileHeight() {
+        return tileHeight;
+    }
+
+    public float getOffsetX() {
+        return offsetX;
+    }
+
+    public float getOffsetY() {
+        return offsetY;
+    }
+
+    public float getUnitScale() {
+        return unitScale;
+    }
+
+    public void setUnitScale(float unitScale) {
+        this.unitScale = unitScale;
+    }
+
+    public float getOverlayScale() {
+        return overlayScale;
+    }
+
+    public void setOverlayScale(float overlayScale) {
+        this.overlayScale = overlayScale;
+    }
+
+    public boolean hasOverlay() {
+        return overlayed;
+    }
+
+    public Texture getOverlayTexture() {
+        return overlayTexture;
+    }
+
+    public ShaderProgram getOverlayShaderProgram() {
+        return overlayShaderProgram;
+    }
+
+    public void setOverlay(Texture overlayTexture, ShaderProgram overlayShaderProgram) {
+        this.overlayTexture = overlayTexture;
+        this.overlayShaderProgram = overlayShaderProgram;
+        overlayed = (overlayTexture != null && overlayShaderProgram != null);
+        if (overlayed)
+            overlayScale = 1f / overlayTexture.getWidth();
+    }
+
+    public boolean hasTileSet() {
+        return texture != null;
+    }
+
+    public Texture getTileSetTexture() {
+        return texture;
+    }
+
+    public void setTileSet(final TextureRegion textureRegion) {
+        texture = textureRegion.getTexture();
+        final float tileSetU = textureRegion.getU();
+        final float tileSetV = textureRegion.getV();
         final float width = tileWidth / texture.getWidth();
         final float height = tileHeight / texture.getHeight();
 
-        final float insetX = 0.05f / texture.getWidth();
-        final float insetY = 0.05f / texture.getHeight();
+        final float insetX = insetToleranceX / texture.getWidth();
+        final float insetY = insetToleranceY / texture.getHeight();
         for (int i = 0; i < 4; i++)
             for (int j = 0; j < 4; j++) {
                 final float u = tileSetU + i * width + insetX;
                 final float v = tileSetV + j * height + insetY;
-                this.tileSet[i + j * 4] = new TextureRegion(texture, u, v, u + width - 2 * insetX, v + height - 2 * insetY);
+                tileSet[i + j * 4] = new TextureRegion(texture, u, v, u + width - 2 * insetX, v + height - 2 * insetY);
             }
-
-        reset(false);
     }
 
-    public void reset(final boolean state) {
+    public void fill(boolean state) {
         for (final boolean[] row : tiles)
             Arrays.fill(row, state);
-        final byte tile = conversions.get(state ? 0b1111 : 0b0000);
+        final byte tile = configuration.get(state ? 0b1111 : 0b0000);
         for (final byte[] row : indices)
             Arrays.fill(row, tile);
     }
@@ -131,24 +212,30 @@ public class TileLayer {
             bitmask |= tileAt(nX - neighbors[0].x, nY - neighbors[0].y) ? (1 << 2) : 0;
             bitmask |= tileAt(nX - neighbors[3].x, nY - neighbors[3].y) ? (1 << 1) : 0;
             bitmask |= tileAt(nX - neighbors[2].x, nY - neighbors[2].y) ? (1) : 0;
-            indices[nX][nY] = conversions.get(bitmask);
+            indices[nX][nY] = configuration.get(bitmask);
         }
     }
 
     public void render(final Batch batch) {
-        overlay.bind(1);
-        texture.bind(0);
+        if (texture == null)
+            return;
 
-        shader.bind();
-        shader.setUniformi("u_overlay", 1);
-        shader.setUniformi("u_texture", 0);
-        shader.setUniformf("u_scale", overlayScale / unitScale);
+        if (overlayed) {
+            overlayTexture.bind(1);
+            texture.bind(0);
+            overlayShaderProgram.bind();
+            overlayShaderProgram.setUniformi("u_overlay", 1);
+            overlayShaderProgram.setUniformi("u_texture", 0);
+            overlayShaderProgram.setUniformf("u_scale", overlayScale / unitScale);
+            batch.setShader(overlayShaderProgram);
+        }
 
-        batch.setShader(shader);
         for (int x = 0; x < tilesX; x++)
             for (int y = 0; y < tilesY; y++)
                 batch.draw(tileSet[indices[x][y]], (offsetX + x * tileWidth) * unitScale, (offsetY + y * tileHeight) * unitScale, tileWidth * unitScale, tileHeight * unitScale);
-        batch.setShader(null);
+        
+        if (overlayed)
+            batch.setShader(null);
     }
 
 }

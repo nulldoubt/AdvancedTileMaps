@@ -123,12 +123,14 @@ public class AdvancedTileMaps extends ApplicationAdapter {
         ((OrthographicCamera) viewport.getCamera()).zoom = 1f / 2.5f;
 
         // initializing our dirt tile layer.
-        dirtLayer = new TileLayer(new TextureRegion(dirt), dirtOverlay, shader, 64, 64, 16f, 16f, 1f / 16f);
-        dirtLayer.reset(true); // we don't want our dirt layer to have holes!
+        dirtLayer = new TileLayer(64, 64, 16f, 16f, 1f / 16f, true);
+        dirtLayer.setTileSet(new TextureRegion(dirt));
+        dirtLayer.setOverlay(dirtOverlay, shader);
 
         // initializing our grass tile layer.
-        grassLayer = new TileLayer(new TextureRegion(grass), grassOverlay, shader, 64, 64, 16f, 16f, 1f / 16f);
-        grassLayer.reset(false); // our grass layer should be empty at first.
+        grassLayer = new TileLayer(64, 64, 16f, 16f, 1f / 16f, false);
+        grassLayer.setTileSet(new TextureRegion(grass));
+        grassLayer.setOverlay(grassOverlay, shader);
 
         // setting the default input processor.
         Gdx.input.setInputProcessor(new InputAdapter() {
@@ -180,8 +182,8 @@ public class AdvancedTileMaps extends ApplicationAdapter {
 
         // here, we clamp the camera position to our world boundaries.
         camera.position.set(
-            MathUtils.clamp(camera.position.x, width + 1f, dirtLayer.tilesX * dirtLayer.tileWidth * dirtLayer.unitScale - width),
-            MathUtils.clamp(camera.position.y, height + 1f, dirtLayer.tilesY * dirtLayer.tileHeight * dirtLayer.unitScale - height),
+            MathUtils.clamp(camera.position.x, width + 1f, dirtLayer.getTilesX() * dirtLayer.getTileWidth() * dirtLayer.getUnitScale() - width),
+            MathUtils.clamp(camera.position.y, height + 1f, dirtLayer.getTilesY() * dirtLayer.getTileHeight() * dirtLayer.getUnitScale() - height),
             0f
         );
 
