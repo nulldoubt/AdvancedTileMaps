@@ -117,7 +117,7 @@ tileLayer.render(batch);   // Render using a batch
 If you experience **texture bleeding**, adjust the inset tolerance:
 
 ```java
-tileLayer.setInsetTolerance(float xTolerance, float yTolerance);
+TileLayer.setInsetTolerance(float xTolerance, float yTolerance);
 ```
 
 This allows you to handle texture bleeding properly at runtime, without ever modifying your texture.
@@ -129,13 +129,29 @@ Suggested values:
 
 ### Custom Auto-Tile Configuration
 
-If your tile-set layout differs from the default, you can set a **custom auto-tile index mapping**:
+If your tile-set layout differs from the default, you can set a **custom auto-tile configuration**:
 
 ```java
-tileLayer.setAutoTileConfiguration(IntMap<Byte> customMapping);
+TileLayer.setAutoTileConfiguration(IntMap<Byte> configuration);
 ```
 
-*Note:* This is currently a **static property**, meaning it applies to all tile layers.
+*Note that this is currently a **static property**, meaning it applies to all tile layers.*
+
+### Rendering Strategies
+
+You may experiment with different `RenderStrategy` for your tilemap, there are 4 rendering strategies 
+integrated as of now:
+* `RenderStrategy.ALL_TILES_ALL_QUADS` will render all tiles and all quads.
+* `RenderStrategy.ALL_TILES_VIEW_QUADS` will render all tiles but only visible quads.
+* `RenderStrategy.VIEW_TILES_ALL_QUADS` will render visible tiles but all quads.
+* (default) `RenderStrategy.VIEW_TILES_VIEW_QUADS` will render visible tiles and only visible quads.
+
+*Visible quads are the ones associated with bitmask 0 in the auto-tile configuration.*
+
+You may change the current tile layer rendering strategy like this:
+```java
+tileLayer.setRenderStrategy(renderStrategy);
+```
 
 ### Serialization
 

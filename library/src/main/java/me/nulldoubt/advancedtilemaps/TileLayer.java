@@ -22,6 +22,8 @@ public class TileLayer {
 
     private static final IntMap<Byte> configuration;
     private static final GridPoint2[] neighbors;
+
+    private static RenderStrategy defaultRenderStrategy;
     private static float insetToleranceX;
     private static float insetToleranceY;
     private static byte zeroIndex;
@@ -50,6 +52,7 @@ public class TileLayer {
             new GridPoint2(0, 1), new GridPoint2(1, 1)
         };
 
+        defaultRenderStrategy = RenderStrategy.VIEW_TILES_VIEW_QUADS;
         insetToleranceX = 0.01f;
         insetToleranceY = 0.01f;
     }
@@ -64,6 +67,14 @@ public class TileLayer {
     public static void setInsetTolerance(float insetToleranceX, float insetToleranceY) {
         TileLayer.insetToleranceX = insetToleranceX;
         TileLayer.insetToleranceY = insetToleranceY;
+    }
+
+    public static RenderStrategy getDefaultRenderStrategy() {
+        return defaultRenderStrategy;
+    }
+
+    public static void setDefaultRenderStrategy(RenderStrategy defaultRenderStrategy) {
+        TileLayer.defaultRenderStrategy = defaultRenderStrategy;
     }
 
     /* Serialization methods */
@@ -86,7 +97,7 @@ public class TileLayer {
             false
         );
         tileLayer.setOverlayScale(root.getFloat("overlayScale"));
-        tileLayer.setSkipEmptyQuads(root.getBoolean("skipEmptyQuads"));
+        tileLayer.setRenderStrategy(RenderStrategy.valueOf(root.getString("renderStrategy")));
 
         boolean[][] tiles = _decompress(root.get("tiles").asByteArray(), tileLayer.tilesX, tileLayer.tilesY);
         for (int x = 0; x < tileLayer.tilesX; x++)
@@ -110,7 +121,7 @@ public class TileLayer {
                 .set("tileHeight", tileLayer.tileHeight)
                 .set("overlayScale", tileLayer.overlayScale)
                 .set("unitScale", tileLayer.unitScale)
-                .set("skipEmptyQuads", tileLayer.skipEmptyQuads)
+                .set("renderStrategy", tileLayer.renderStrategy.name())
                 .set("tiles", _compress(tileLayer.tiles, tileLayer.tilesX, tileLayer.tilesY))
                 .pop()
                 .flush();
@@ -172,7 +183,7 @@ public class TileLayer {
     private final boolean[][] tiles;
     private final byte[][] indices;
 
-    private boolean skipEmptyQuads;
+    private RenderStrategy renderStrategy;
     private int tilesRendered;
     private int quadsRendered;
 
@@ -192,8 +203,7 @@ public class TileLayer {
         tileSet = new TextureRegion[16];
         viewBounds = new Rectangle();
 
-        skipEmptyQuads = true;
-
+        renderStrategy = defaultRenderStrategy;
         fill(fill);
     }
 
@@ -271,7 +281,6 @@ public class TileLayer {
         final float tileSetV = textureRegion.getV();
         final float width = tileWidth / texture.getWidth();
         final float height = tileHeight / texture.getHeight();
-
         final float insetX = insetToleranceX / texture.getWidth();
         final float insetY = insetToleranceY / texture.getHeight();
         for (int i = 0; i < 4; i++)
@@ -294,12 +303,12 @@ public class TileLayer {
         return quadsRendered;
     }
 
-    public boolean isSkipEmptyQuads() {
-        return skipEmptyQuads;
+    public RenderStrategy getRenderStrategy() {
+        return renderStrategy;
     }
 
-    public void setSkipEmptyQuads(boolean skipEmptyQuads) {
-        this.skipEmptyQuads = skipEmptyQuads;
+    public void setRenderStrategy(RenderStrategy renderStrategy) {
+        this.renderStrategy = renderStrategy;
     }
 
     public void fill(boolean state) {
@@ -367,37 +376,120 @@ public class TileLayer {
             batch.setShader(overlayShaderProgram);
         }
 
-        renderTiles(batch);
+        renderStrategy.render(this, batch);
 
         if (overlayed)
             batch.setShader(null);
     }
 
-    private void renderTiles(Batch batch) {
+    public enum RenderStrategy {
 
-        int col1 = Math.max(0, (int) ((viewBounds.x - offsetX) / (tileWidth * unitScale)));
-        int col2 = Math.min(tilesX, (int) ((viewBounds.x + viewBounds.width) / (tileWidth * unitScale)) + 1);
-
-        int row1 = Math.max(0, (int) ((viewBounds.y - offsetY) / (tileHeight * unitScale)));
-        int row2 = Math.min(tilesY, (int) ((viewBounds.y + viewBounds.height) / (tileHeight * unitScale)) + 1);
-
-        tilesRendered = 0;
-        quadsRendered = 0;
-        byte index;
-        for (int x = col1; x < col2; x++) {
-            for (int y = row1; y < row2; y++) {
-                if (tiles[x][y])
-                    tilesRendered++;
-                index = indices[x][y];
-                if (index == zeroIndex && skipEmptyQuads)
-                    continue;
-                quadsRendered++;
-                batch.draw(tileSet[index],
-                    (offsetX + x * tileWidth) * unitScale,
-                    (offsetY + y * tileHeight) * unitScale,
-                    tileWidth * unitScale, tileHeight * unitScale);
+        ALL_TILES_ALL_QUADS() {
+            @Override
+            public void render(TileLayer tileLayer, Batch batch) {
+                final float tileWidth = tileLayer.tileWidth * tileLayer.unitScale;
+                final float tileHeight = tileLayer.tileHeight * tileLayer.unitScale;
+                tileLayer.tilesRendered = 0;
+                tileLayer.quadsRendered = 0;
+                for (int x = 0; x < tileLayer.tilesX; x++) {
+                    for (int y = 0; y < tileLayer.tilesY; y++) {
+                        if (tileLayer.tiles[x][y])
+                            tileLayer.tilesRendered++;
+                        tileLayer.quadsRendered++;
+                        batch.draw(tileLayer.tileSet[tileLayer.indices[x][y]],
+                            (tileLayer.offsetX + x * tileLayer.tileWidth) * tileLayer.unitScale,
+                            (tileLayer.offsetY + y * tileLayer.tileHeight) * tileLayer.unitScale,
+                            tileWidth, tileHeight
+                        );
+                    }
+                }
             }
-        }
+        },
+
+        ALL_TILES_VIEW_QUADS() {
+            @Override
+            public void render(TileLayer tileLayer, Batch batch) {
+                final float tileWidth = tileLayer.tileWidth * tileLayer.unitScale;
+                final float tileHeight = tileLayer.tileHeight * tileLayer.unitScale;
+                tileLayer.tilesRendered = 0;
+                tileLayer.quadsRendered = 0;
+                byte index;
+                for (int x = 0; x < tileLayer.tilesX; x++) {
+                    for (int y = 0; y < tileLayer.tilesY; y++) {
+                        if (tileLayer.tiles[x][y])
+                            tileLayer.tilesRendered++;
+                        index = tileLayer.indices[x][y];
+                        if (index == zeroIndex)
+                            continue;
+                        tileLayer.quadsRendered++;
+                        batch.draw(tileLayer.tileSet[index],
+                            (tileLayer.offsetX + x * tileLayer.tileWidth) * tileLayer.unitScale,
+                            (tileLayer.offsetY + y * tileLayer.tileHeight) * tileLayer.unitScale,
+                            tileWidth, tileHeight
+                        );
+                    }
+                }
+            }
+        },
+
+        VIEW_TILES_ALL_QUADS() {
+            @Override
+            public void render(TileLayer tileLayer, Batch batch) {
+                final float tileWidth = tileLayer.tileWidth * tileLayer.unitScale;
+                final float tileHeight = tileLayer.tileHeight * tileLayer.unitScale;
+                int col1 = Math.max(0, (int) ((tileLayer.viewBounds.x - tileLayer.offsetX) / (tileWidth)));
+                int col2 = Math.min(tileLayer.tilesX, (int) ((tileLayer.viewBounds.x + tileLayer.viewBounds.width) / (tileWidth)) + 1);
+                int row1 = Math.max(0, (int) ((tileLayer.viewBounds.y - tileLayer.offsetY) / (tileHeight)));
+                int row2 = Math.min(tileLayer.tilesY, (int) ((tileLayer.viewBounds.y + tileLayer.viewBounds.height) / (tileHeight)) + 1);
+                tileLayer.tilesRendered = 0;
+                tileLayer.quadsRendered = 0;
+                for (int x = col1; x < col2; x++) {
+                    for (int y = row1; y < row2; y++) {
+                        if (tileLayer.tiles[x][y])
+                            tileLayer.tilesRendered++;
+                        tileLayer.quadsRendered++;
+                        batch.draw(tileLayer.tileSet[tileLayer.indices[x][y]],
+                            (tileLayer.offsetX + x * tileLayer.tileWidth) * tileLayer.unitScale,
+                            (tileLayer.offsetY + y * tileLayer.tileHeight) * tileLayer.unitScale,
+                            tileWidth, tileHeight
+                        );
+                    }
+                }
+            }
+        },
+
+        VIEW_TILES_VIEW_QUADS() {
+            @Override
+            public void render(TileLayer tileLayer, Batch batch) {
+                final float tileWidth = tileLayer.tileWidth * tileLayer.unitScale;
+                final float tileHeight = tileLayer.tileHeight * tileLayer.unitScale;
+                int col1 = Math.max(0, (int) ((tileLayer.viewBounds.x - tileLayer.offsetX) / (tileWidth)));
+                int col2 = Math.min(tileLayer.tilesX, (int) ((tileLayer.viewBounds.x + tileLayer.viewBounds.width) / (tileWidth)) + 1);
+                int row1 = Math.max(0, (int) ((tileLayer.viewBounds.y - tileLayer.offsetY) / (tileHeight)));
+                int row2 = Math.min(tileLayer.tilesY, (int) ((tileLayer.viewBounds.y + tileLayer.viewBounds.height) / (tileHeight)) + 1);
+                tileLayer.tilesRendered = 0;
+                tileLayer.quadsRendered = 0;
+                byte index;
+                for (int x = col1; x < col2; x++) {
+                    for (int y = row1; y < row2; y++) {
+                        if (tileLayer.tiles[x][y])
+                            tileLayer.tilesRendered++;
+                        index = tileLayer.indices[x][y];
+                        if (index == zeroIndex)
+                            continue;
+                        tileLayer.quadsRendered++;
+                        batch.draw(tileLayer.tileSet[index],
+                            (tileLayer.offsetX + x * tileLayer.tileWidth) * tileLayer.unitScale,
+                            (tileLayer.offsetY + y * tileLayer.tileHeight) * tileLayer.unitScale,
+                            tileWidth, tileHeight
+                        );
+                    }
+                }
+            }
+        };
+
+        public abstract void render(TileLayer tileLayer, Batch batch);
+
     }
 
 }
