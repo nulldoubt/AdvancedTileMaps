@@ -139,16 +139,20 @@ TileLayer.setAutoTileConfiguration(IntMap<Byte> configuration);
 
 ### Rendering Strategies
 
-You may experiment with different `RenderStrategy` for your tilemap, there are 4 rendering strategies 
+You may experiment with different `RenderStrategy` for your tilemap, there are 4 rendering strategies
 integrated as of now:
-* `RenderStrategy.ALL_TILES_ALL_QUADS` will render all tiles and all quads.
-* `RenderStrategy.ALL_TILES_VIEW_QUADS` will render all tiles but only visible quads.
-* `RenderStrategy.VIEW_TILES_ALL_QUADS` will render visible tiles but all quads.
-* (default) `RenderStrategy.VIEW_TILES_VIEW_QUADS` will render visible tiles and only visible quads.
+
+* `IntegratedStrategy.ALL_TILES_ALL_QUADS` will render all tiles and all quads.
+* `IntegratedStrategy.ALL_TILES_VIEW_QUADS` will render all tiles but only visible quads.
+* `IntegratedStrategy.VIEW_TILES_ALL_QUADS` will render visible tiles but all quads.
+* (default) `IntegratedStrategy.VIEW_TILES_VIEW_QUADS` will render visible tiles and only visible quads.
 
 *Visible quads are the ones associated with bitmask 0 in the auto-tile configuration.*
 
+**You can also provide your own implementation of the `RenderStrategy` interface.**
+
 You may change the current tile layer rendering strategy like this:
+
 ```java
 tileLayer.setRenderStrategy(renderStrategy);
 ```
@@ -163,7 +167,9 @@ You may *write* your tile layer to a file handle or an output stream like this:
 
 ```java
 TileLayer.write(tileLayer, fileHandle); // write to a file handle.
-TileLayer.write(tileLayer, outputStream); // write to an output stream.
+TileLayer.
+
+write(tileLayer, outputStream); // write to an output stream.
 ```
 
 And you may *read* your tile layer from a file handle or an input stream like this:

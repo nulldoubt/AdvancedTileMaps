@@ -52,7 +52,7 @@ public class TileLayer {
             new GridPoint2(0, 1), new GridPoint2(1, 1)
         };
 
-        defaultRenderStrategy = RenderStrategy.VIEW_TILES_VIEW_QUADS;
+        defaultRenderStrategy = IntegratedStrategy.VIEW_TILES_VIEW_QUADS;
         insetToleranceX = 0.01f;
         insetToleranceY = 0.01f;
     }
@@ -97,7 +97,7 @@ public class TileLayer {
             false
         );
         tileLayer.setOverlayScale(root.getFloat("overlayScale"));
-        tileLayer.setRenderStrategy(RenderStrategy.valueOf(root.getString("renderStrategy")));
+        tileLayer.setRenderStrategy(IntegratedStrategy.valueOf(root.getString("renderStrategy")));
 
         boolean[][] tiles = _decompress(root.get("tiles").asByteArray(), tileLayer.tilesX, tileLayer.tilesY);
         for (int x = 0; x < tileLayer.tilesX; x++)
@@ -121,7 +121,7 @@ public class TileLayer {
                 .set("tileHeight", tileLayer.tileHeight)
                 .set("overlayScale", tileLayer.overlayScale)
                 .set("unitScale", tileLayer.unitScale)
-                .set("renderStrategy", tileLayer.renderStrategy.name())
+                .set("renderStrategy", IntegratedStrategy.nameOf(tileLayer.renderStrategy))
                 .set("tiles", _compress(tileLayer.tiles, tileLayer.tilesX, tileLayer.tilesY))
                 .pop()
                 .flush();
@@ -382,7 +382,7 @@ public class TileLayer {
             batch.setShader(null);
     }
 
-    public enum RenderStrategy {
+    public enum IntegratedStrategy implements RenderStrategy {
 
         ALL_TILES_ALL_QUADS() {
             @Override
@@ -488,7 +488,17 @@ public class TileLayer {
             }
         };
 
-        public abstract void render(TileLayer tileLayer, Batch batch);
+        public static String nameOf(RenderStrategy renderStrategy) {
+            if (renderStrategy instanceof IntegratedStrategy integratedStrategy)
+                return integratedStrategy.name();
+            return renderStrategy.getClass().getSimpleName();
+        }
+
+    }
+
+    public interface RenderStrategy {
+
+        void render(TileLayer tileLayer, Batch batch);
 
     }
 
