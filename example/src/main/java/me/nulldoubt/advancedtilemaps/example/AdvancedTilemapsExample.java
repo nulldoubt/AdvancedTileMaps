@@ -23,11 +23,7 @@ public class AdvancedTilemapsExample extends ApplicationAdapter {
     public static void main(String[] args) {
         if (StartupHelper.startNewJvmIfRequired())
             return; // This handles macOS support and helps on Windows.
-        createApplication();
-    }
-
-    private static Lwjgl3Application createApplication() {
-        return new Lwjgl3Application(new AdvancedTilemapsExample(), getDefaultConfiguration());
+        new Lwjgl3Application(new AdvancedTilemapsExample(), getDefaultConfiguration());
     }
 
     private static Lwjgl3ApplicationConfiguration getDefaultConfiguration() {
@@ -43,9 +39,11 @@ public class AdvancedTilemapsExample extends ApplicationAdapter {
     private static final String interfaceDebugInfo = """
         Rendered Tiles [CYAN](Dirt): %d[]
         Rendered Quads [CYAN](Dirt): %d[]
+        Render Strategy [CYAN](Dirt): %s[]
 
         Rendered Tiles [GREEN](Grass): %d[]
         Rendered Quads [GREEN](Grass): %d[]
+        Render Strategy [GREEN](Grass): %s[]
 
         Camera [YELLOW]Position: (%.2f, %.2f)[]
         Camera [YELLOW]Zoom: %.4f[]
@@ -315,8 +313,10 @@ public class AdvancedTilemapsExample extends ApplicationAdapter {
             interfaceDebugInfo,
             dirtLayer.getTilesRendered(),
             dirtLayer.getQuadsRendered(),
+            dirtLayer.getRenderStrategy(),
             grassLayer.getTilesRendered(),
             grassLayer.getQuadsRendered(),
+            grassLayer.getRenderStrategy(),
             worldCamera.position.x,
             worldCamera.position.y,
             worldCamera.zoom,
