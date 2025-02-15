@@ -1,6 +1,6 @@
 # Advanced Tilemaps
 
-Ever wondered how you can create **overlayed, auto-tileable, multi-layered, viewport-friendly, efficient, performant,
+Ever wondered how you can create **overlayed, auto-tileable, multi-layered, viewport-friendly, serializable, performant,
 and customizable** tilemaps in libGDX with **minimal effort** using the **dual-grid system**?
 
 ## What is the Dual-Grid System?
@@ -107,9 +107,7 @@ In your render pipeline:
 
 ```java
 tileLayer.setView(camera); // Set view bounds to the camera
-tileLayer.
-
-render(batch);   // Render using a batch
+tileLayer.render(batch);   // Render using a batch
 ```
 
 *You may also use the overloaded method `setView(x, y, w, h)` if you don't have a camera.*
@@ -138,6 +136,26 @@ tileLayer.setAutoTileConfiguration(IntMap<Byte> customMapping);
 ```
 
 *Note:* This is currently a **static property**, meaning it applies to all tile layers.
+
+### Serialization
+
+In case you want to serialize your tile layers, the `TileLayer` class offers a couple of
+convenient and efficient static methods that simplify the serialization process for you
+using the `UBJson` file format.
+
+You may *write* your tile layer to a file handle or an output stream like this:
+
+```java
+TileLayer.write(tileLayer, fileHandle); // write to a file handle.
+TileLayer.write(tileLayer, outputStream); // write to an output stream.
+```
+
+And you may *read* your tile layer from a file handle or an input stream like this:
+
+```java
+TileLayer.read(fileHandle); // read from a file handle.
+TileLayer.read(outputStream); // read from an input stream.
+```
 
 ## Library vs. Example
 
