@@ -29,6 +29,7 @@ public class AdvancedTileMaps extends ApplicationAdapter {
         Camera [YELLOW]Zoom: %.4f[]
 
         FPS: [MAGENTA]%d[]
+        Draw-Calls: [MAGENTA]%d[]
         """;
 
     // These here are the variables for our 'dirt' tile layer.
@@ -45,7 +46,7 @@ public class AdvancedTileMaps extends ApplicationAdapter {
         and these here are the necessary variables
         for us to draw the tile layers.
     */
-    private Batch batch;
+    private SpriteBatch batch;
     private ShaderProgram shader;
 
     /*
@@ -99,6 +100,8 @@ public class AdvancedTileMaps extends ApplicationAdapter {
     private BitmapFont font;
     private BitmapFontCache fontCache;
 
+    private int drawCalls;
+
     private final Vector2 cameraVelocity = new Vector2();
     private final float cameraSpeed = 21f; // in world-units-per-second.
 
@@ -142,7 +145,7 @@ public class AdvancedTileMaps extends ApplicationAdapter {
             throw new RuntimeException("Unable to compile shader: " + shader.getLog());
 
         // creating our sprite-batch.
-        batch = new SpriteBatch();
+        batch = new SpriteBatch(3000);
 
         // creating our viewport, with our world bounds being of the same aspect-ratio of our native resolution.
         worldViewport = new FitViewport(40f, 22.5f);
@@ -211,6 +214,7 @@ public class AdvancedTileMaps extends ApplicationAdapter {
 
     @Override
     public void render() {
+        drawCalls = batch.renderCalls;
         ScreenUtils.clear(Color.BLACK); // clear the screen.
 
         final float delta = Gdx.graphics.getDeltaTime();
@@ -288,7 +292,8 @@ public class AdvancedTileMaps extends ApplicationAdapter {
             worldCamera.position.x,
             worldCamera.position.y,
             worldCamera.zoom,
-            Gdx.graphics.getFramesPerSecond()
+            Gdx.graphics.getFramesPerSecond(),
+            drawCalls
         ), 15f, Gdx.graphics.getHeight() - 20f);
         fontCache.draw(batch);
     }
