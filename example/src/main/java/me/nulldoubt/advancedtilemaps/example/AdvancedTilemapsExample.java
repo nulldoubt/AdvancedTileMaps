@@ -4,6 +4,8 @@ import com.badlogic.gdx.ApplicationAdapter;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
 import com.badlogic.gdx.InputAdapter;
+import com.badlogic.gdx.backends.lwjgl3.Lwjgl3Application;
+import com.badlogic.gdx.backends.lwjgl3.Lwjgl3ApplicationConfiguration;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.Texture;
@@ -15,7 +17,26 @@ import com.badlogic.gdx.utils.ScreenUtils;
 import com.badlogic.gdx.utils.viewport.*;
 import me.nulldoubt.advancedtilemaps.TileLayer;
 
-public class AdvancedTileMaps extends ApplicationAdapter {
+public class AdvancedTilemapsExample extends ApplicationAdapter {
+
+    public static void main(String[] args) {
+        if (StartupHelper.startNewJvmIfRequired())
+            return; // This handles macOS support and helps on Windows.
+        createApplication();
+    }
+
+    private static Lwjgl3Application createApplication() {
+        return new Lwjgl3Application(new AdvancedTilemapsExample(), getDefaultConfiguration());
+    }
+
+    private static Lwjgl3ApplicationConfiguration getDefaultConfiguration() {
+        Lwjgl3ApplicationConfiguration configuration = new Lwjgl3ApplicationConfiguration();
+        configuration.setTitle("Advanced Tilemaps Example");
+        configuration.useVsync(true);
+        configuration.setForegroundFPS(Lwjgl3ApplicationConfiguration.getDisplayMode().refreshRate + 1);
+        configuration.setWindowedMode(800, 450);
+        return configuration;
+    }
 
     private static final Vector2 temp = new Vector2();
     private static final String interfaceDebugInfo = """

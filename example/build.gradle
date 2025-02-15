@@ -8,7 +8,7 @@ plugins {
 }
 
 sourceSets.main.resources.srcDirs += [rootProject.file('assets').path]
-mainClassName = 'me.nulldoubt.advancedtilemaps.example.ExampleLauncher'
+mainClassName = 'me.nulldoubt.advancedtilemaps.example.AdvancedTilemapsExample'
 application.setMainClass(mainClassName)
 eclipse.project.name = appName + '-lwjgl3'
 java.sourceCompatibility = 17
