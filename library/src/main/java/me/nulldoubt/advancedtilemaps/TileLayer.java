@@ -1,5 +1,6 @@
 package me.nulldoubt.advancedtilemaps;
 
+import com.badlogic.gdx.files.FileHandle;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.Batch;
@@ -8,7 +9,13 @@ import com.badlogic.gdx.graphics.glutils.ShaderProgram;
 import com.badlogic.gdx.math.GridPoint2;
 import com.badlogic.gdx.math.Rectangle;
 import com.badlogic.gdx.utils.IntMap;
+import com.badlogic.gdx.utils.JsonValue;
+import com.badlogic.gdx.utils.UBJsonReader;
+import com.badlogic.gdx.utils.UBJsonWriter;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.Arrays;
 
 public class TileLayer {
@@ -57,6 +64,89 @@ public class TileLayer {
     public static void setInsetTolerance(float insetToleranceX, float insetToleranceY) {
         TileLayer.insetToleranceX = insetToleranceX;
         TileLayer.insetToleranceY = insetToleranceY;
+    }
+
+    /* Serialization methods */
+    public static TileLayer read(FileHandle fileHandle) {
+        return read(fileHandle.read());
+    }
+
+    public static TileLayer read(InputStream inputStream) {
+        final UBJsonReader reader = new UBJsonReader();
+        reader.oldFormat = false;
+
+        final JsonValue root = reader.parse(inputStream);
+
+        final TileLayer tileLayer = new TileLayer(
+            root.getInt("tilesX"),
+            root.getInt("tilesY"),
+            root.getInt("tileWidth"),
+            root.getInt("tileHeight"),
+            root.getFloat("unitScale"),
+            false
+        );
+        tileLayer.setOverlayScale(root.getFloat("overlayScale"));
+        tileLayer.setSkipEmptyQuads(root.getBoolean("skipEmptyQuads"));
+
+        boolean[][] tiles = _decompress(root.get("tiles").asByteArray(), tileLayer.tilesX, tileLayer.tilesY);
+        for (int x = 0; x < tileLayer.tilesX; x++)
+            for (int y = 0; y < tileLayer.tilesY; y++)
+                tileLayer.tileAt(x, y, tiles[x][y]);
+
+        return tileLayer;
+    }
+
+    public static boolean write(TileLayer tileLayer, FileHandle fileHandle) {
+        return write(tileLayer, fileHandle.write(false));
+    }
+
+    public static boolean write(TileLayer tileLayer, OutputStream outputStream) {
+        try (final UBJsonWriter writer = new UBJsonWriter(outputStream)) {
+            writer
+                .object()
+                .set("tilesX", tileLayer.tilesX)
+                .set("tilesY", tileLayer.tilesY)
+                .set("tileWidth", tileLayer.tileWidth)
+                .set("tileHeight", tileLayer.tileHeight)
+                .set("overlayScale", tileLayer.overlayScale)
+                .set("unitScale", tileLayer.unitScale)
+                .set("skipEmptyQuads", tileLayer.skipEmptyQuads)
+                .set("tiles", _compress(tileLayer.tiles, tileLayer.tilesX, tileLayer.tilesY))
+                .pop()
+                .flush();
+            return true;
+        } catch (IOException e) {
+            return false;
+        }
+    }
+
+    private static byte[] _compress(boolean[][] tiles, int tilesX, int tilesY) {
+        int totalBits = tilesX * tilesY;
+        int totalBytes = (totalBits + 7) / 8;
+        byte[] bytes = new byte[totalBytes];
+
+        int bitIndex = 0;
+        for (int y = 0; y < tilesY; y++) {
+            for (boolean[] tile : tiles) {
+                if (tile[y])
+                    bytes[bitIndex / 8] |= (1 << (bitIndex % 8));
+                bitIndex++;
+            }
+        }
+        return bytes;
+    }
+
+    private static boolean[][] _decompress(byte[] bytes, int tilesX, int tilesY) {
+        boolean[][] tiles = new boolean[tilesX][tilesY];
+
+        int bitIndex = 0;
+        for (int y = 0; y < tilesY; y++) {
+            for (int x = 0; x < tilesX; x++) {
+                tiles[x][y] = (bytes[bitIndex / 8] & (1 << (bitIndex % 8))) != 0;
+                bitIndex++;
+            }
+        }
+        return tiles;
     }
 
     private final TextureRegion[] tileSet;
