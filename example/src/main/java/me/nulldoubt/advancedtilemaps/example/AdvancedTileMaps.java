@@ -7,9 +7,7 @@ import com.badlogic.gdx.InputAdapter;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.Texture;
-import com.badlogic.gdx.graphics.g2d.Batch;
-import com.badlogic.gdx.graphics.g2d.SpriteBatch;
-import com.badlogic.gdx.graphics.g2d.TextureRegion;
+import com.badlogic.gdx.graphics.g2d.*;
 import com.badlogic.gdx.graphics.glutils.ShaderProgram;
 import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Vector2;
@@ -20,6 +18,18 @@ import me.nulldoubt.advancedtilemaps.TileLayer;
 public class AdvancedTileMaps extends ApplicationAdapter {
 
     private static final Vector2 temp = new Vector2();
+    private static final String interfaceDebugInfo = """
+        Rendered Tiles [CYAN](Dirt): %d[]
+        Rendered Quads [CYAN](Dirt): %d[]
+
+        Rendered Tiles [GREEN](Grass): %d[]
+        Rendered Quads [GREEN](Grass): %d[]
+
+        Camera [YELLOW]Position: (%.2f, %.2f)[]
+        Camera [YELLOW]Zoom: %.4f[]
+
+        FPS: [MAGENTA]%d[]
+        """;
 
     // These here are the variables for our 'dirt' tile layer.
     private Texture dirt;
@@ -80,7 +90,14 @@ public class AdvancedTileMaps extends ApplicationAdapter {
             batch.draw(tile, x, y, 1f, 1f); -> tile is 1x1 world units, independent of screen resolution.
 
      */
-    private Viewport viewport;
+    private Viewport worldViewport;
+    private OrthographicCamera worldCamera;
+
+    private Viewport interfaceViewport;
+    private OrthographicCamera interfaceCamera;
+
+    private BitmapFont font;
+    private BitmapFontCache fontCache;
 
     private final Vector2 cameraVelocity = new Vector2();
     private final float cameraSpeed = 21f; // in world-units-per-second.
@@ -128,8 +145,12 @@ public class AdvancedTileMaps extends ApplicationAdapter {
         batch = new SpriteBatch();
 
         // creating our viewport, with our world bounds being of the same aspect-ratio of our native resolution.
-        viewport = new FitViewport(40f, 22.5f);
-        ((OrthographicCamera) viewport.getCamera()).zoom = targetZoom = 1f / 2.5f;
+        worldViewport = new FitViewport(40f, 22.5f);
+        worldCamera = (OrthographicCamera) worldViewport.getCamera();
+        worldCamera.zoom = targetZoom = 1f / 2.5f;
+
+        interfaceViewport = new ScreenViewport();
+        interfaceCamera = (OrthographicCamera) interfaceViewport.getCamera();
 
         // initializing our dirt tile layer.
         dirtLayer = new TileLayer(64, 64, 16f, 16f, 1f / 16f, true);
@@ -162,21 +183,25 @@ public class AdvancedTileMaps extends ApplicationAdapter {
             @Override
             public boolean touchDown(final int screenX, final int screenY, final int pointer, final int button) {
                 _buttonRight = (button == Input.Buttons.RIGHT);
+                _touchDown = true;
                 handleTile(screenX, screenY);
-                return (_touchDown = true);
+                return true;
             }
 
             @Override
             public boolean touchUp(int screenX, int screenY, int pointer, int button) {
-                boolean b = _touchDown;
                 _touchDown = false;
-                return b;
+                return true;
             }
         });
+
+        font = new BitmapFont();
+        font.getData().markupEnabled = true;
+        fontCache = font.newFontCache();
     }
 
     private void handleTile(int screenX, int screenY) {
-        final Vector2 touch = viewport.unproject(temp.set(screenX, screenY));
+        final Vector2 touch = worldViewport.unproject(temp.set(screenX, screenY));
         grassLayer.tileAt(
             (int) (touch.x - 1f),
             (int) (touch.y - 1f),
@@ -188,14 +213,13 @@ public class AdvancedTileMaps extends ApplicationAdapter {
     public void render() {
         ScreenUtils.clear(Color.BLACK); // clear the screen.
 
-        final OrthographicCamera camera = (OrthographicCamera) viewport.getCamera();
         final float delta = Gdx.graphics.getDeltaTime();
 
-        if (targetZoom != camera.zoom)
-            camera.zoom = MathUtils.lerp(camera.zoom, targetZoom, delta * zoomSpeed);
+        if (targetZoom != worldCamera.zoom)
+            worldCamera.zoom = MathUtils.lerp(worldCamera.zoom, targetZoom, delta * zoomSpeed);
 
-        final float width = (viewport.getWorldWidth() / 2f) * camera.zoom;
-        final float height = (viewport.getWorldHeight() / 2f) * camera.zoom;
+        final float width = (worldViewport.getWorldWidth() / 2f) * worldCamera.zoom;
+        final float height = (worldViewport.getWorldHeight() / 2f) * worldCamera.zoom;
 
         if (Gdx.input.isKeyPressed(Input.Keys.W))
             cameraVelocity.y++;
@@ -209,14 +233,14 @@ public class AdvancedTileMaps extends ApplicationAdapter {
         if (length > 1f)
             cameraVelocity.nor();
 
-        camera.position.x += cameraVelocity.x * cameraSpeed * delta;
-        camera.position.y += cameraVelocity.y * cameraSpeed * delta;
+        worldCamera.position.x += cameraVelocity.x * cameraSpeed * delta;
+        worldCamera.position.y += cameraVelocity.y * cameraSpeed * delta;
         cameraVelocity.setZero();
 
         // here, we clamp the camera position to our world boundaries.
-        camera.position.set(
-            MathUtils.clamp(camera.position.x, width + 1f, dirtLayer.getTilesX() * dirtLayer.getTileWidth() * dirtLayer.getUnitScale() - width),
-            MathUtils.clamp(camera.position.y, height + 1f, dirtLayer.getTilesY() * dirtLayer.getTileHeight() * dirtLayer.getUnitScale() - height),
+        worldCamera.position.set(
+            MathUtils.clamp(worldCamera.position.x, width + 1f, dirtLayer.getTilesX() * dirtLayer.getTileWidth() * dirtLayer.getUnitScale() - width),
+            MathUtils.clamp(worldCamera.position.y, height + 1f, dirtLayer.getTilesY() * dirtLayer.getTileHeight() * dirtLayer.getUnitScale() - height),
             0f
         );
 
@@ -224,31 +248,49 @@ public class AdvancedTileMaps extends ApplicationAdapter {
             URGENT: if you have a viewport or configured the tile
             layers to use a unit-scale, then apply your viewport here!
          */
-        viewport.apply();
+        worldViewport.apply();
 
         // When the camera moves, and we're dragging, then tiles should be set!
         if (length > 0.01f && _touchDown)
             handleTile(Gdx.input.getX(), Gdx.input.getY());
 
         // setting the viewport camera projection matrix.
-        batch.setProjectionMatrix(camera.combined);
+        batch.setProjectionMatrix(worldCamera.combined);
         batch.begin(); // begin the batch.
+        renderWorld(batch);
+        renderInterface(batch);
+        batch.end(); // end the batch.
+    }
 
+    private void renderWorld(Batch batch) {
         /*
             rendering the layers, warning: the order of
             rendering plays a huge role, and it's up to
             you to manage it properly.
          */
-        dirtLayer.setView(camera);
+        dirtLayer.setView(worldCamera);
         dirtLayer.render(batch); // first comes the dirt.
 
-        grassLayer.setView(camera);
+        grassLayer.setView(worldCamera);
         grassLayer.render(batch); // then comes the grass.
+    }
 
-        batch.end(); // end the batch.
-
-        // We'd like to know how many tiles we rendered!
-        System.out.printf("\rDirt tiles rendered: %03d", dirtLayer.getTilesRendered());
+    private void renderInterface(Batch batch) {
+        interfaceViewport.apply(true);
+        batch.setProjectionMatrix(interfaceCamera.combined);
+        fontCache.clear();
+        fontCache.addText(String.format(
+            interfaceDebugInfo,
+            dirtLayer.getTilesRendered(),
+            dirtLayer.getQuadsRendered(),
+            grassLayer.getTilesRendered(),
+            grassLayer.getQuadsRendered(),
+            worldCamera.position.x,
+            worldCamera.position.y,
+            worldCamera.zoom,
+            Gdx.graphics.getFramesPerSecond()
+        ), 15f, Gdx.graphics.getHeight() - 20f);
+        fontCache.draw(batch);
     }
 
     @Override
@@ -258,7 +300,8 @@ public class AdvancedTileMaps extends ApplicationAdapter {
             to update the internal screen size to properly
             handle the conversion of our world units.
          */
-        viewport.update(width, height, true);
+        worldViewport.update(width, height, true);
+        interfaceViewport.update(width, height, false);
     }
 
     @Override
@@ -275,6 +318,7 @@ public class AdvancedTileMaps extends ApplicationAdapter {
         shader.dispose();
         batch.dispose();
 
+        font.dispose();
     }
 
 }
