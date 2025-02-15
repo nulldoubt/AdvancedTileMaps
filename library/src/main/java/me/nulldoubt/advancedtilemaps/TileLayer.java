@@ -17,6 +17,7 @@ public class TileLayer {
     private static final GridPoint2[] neighbors;
     private static float insetToleranceX;
     private static float insetToleranceY;
+    private static byte zeroIndex;
 
     static {
         configuration = new IntMap<>(16);
@@ -35,7 +36,7 @@ public class TileLayer {
         configuration.put(0b1110, (byte) 7);
         configuration.put(0b0110, (byte) 14);
         configuration.put(0b1001, (byte) 4);
-        configuration.put(0b0000, (byte) 12);
+        configuration.put(0b0000, zeroIndex = (byte) 12);
 
         neighbors = new GridPoint2[]{
             new GridPoint2(0, 0), new GridPoint2(1, 0),
@@ -49,6 +50,7 @@ public class TileLayer {
     public static void setAutoTileConfiguration(IntMap<Byte> configuration) {
         TileLayer.configuration.clear(16);
         TileLayer.configuration.putAll(configuration);
+        zeroIndex = TileLayer.configuration.get(0b0000);
     }
 
     /* Re-set your tileSet after using this! */
@@ -79,7 +81,10 @@ public class TileLayer {
 
     private final boolean[][] tiles;
     private final byte[][] indices;
+
+    private boolean skipEmptyQuads;
     private int tilesRendered;
+    private int quadsRendered;
 
     public TileLayer(int tilesX, int tilesY, float tileWidth, float tileHeight, float unitScale, boolean fill) {
         this.tilesX = tilesX;
@@ -96,6 +101,8 @@ public class TileLayer {
 
         tileSet = new TextureRegion[16];
         viewBounds = new Rectangle();
+
+        skipEmptyQuads = true;
 
         fill(fill);
     }
@@ -193,6 +200,18 @@ public class TileLayer {
         return tilesRendered;
     }
 
+    public int getQuadsRendered() {
+        return quadsRendered;
+    }
+
+    public boolean isSkipEmptyQuads() {
+        return skipEmptyQuads;
+    }
+
+    public void setSkipEmptyQuads(boolean skipEmptyQuads) {
+        this.skipEmptyQuads = skipEmptyQuads;
+    }
+
     public void fill(boolean state) {
         for (final boolean[] row : tiles)
             Arrays.fill(row, state);
@@ -273,10 +292,17 @@ public class TileLayer {
         int row2 = Math.min(tilesY, (int) ((viewBounds.y + viewBounds.height) / (tileHeight * unitScale)) + 1);
 
         tilesRendered = 0;
+        quadsRendered = 0;
+        byte index;
         for (int x = col1; x < col2; x++) {
             for (int y = row1; y < row2; y++) {
-                tilesRendered++;
-                batch.draw(tileSet[indices[x][y]],
+                if (tiles[x][y])
+                    tilesRendered++;
+                index = indices[x][y];
+                if (index == zeroIndex && skipEmptyQuads)
+                    continue;
+                quadsRendered++;
+                batch.draw(tileSet[index],
                     (offsetX + x * tileWidth) * unitScale,
                     (offsetY + y * tileHeight) * unitScale,
                     tileWidth * unitScale, tileHeight * unitScale);
