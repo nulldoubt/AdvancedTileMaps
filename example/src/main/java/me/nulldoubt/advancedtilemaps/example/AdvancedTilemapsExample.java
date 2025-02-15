@@ -128,7 +128,7 @@ public class AdvancedTilemapsExample extends ApplicationAdapter {
     private final float cameraSpeed = 21f; // in world-units-per-second.
 
     private float targetZoom;
-    private float zoomSpeed = 21f;
+    private final float zoomSpeed = 21f;
 
     private boolean _touchDown;
     private boolean _buttonRight;
@@ -353,7 +353,10 @@ public class AdvancedTilemapsExample extends ApplicationAdapter {
 
         font.dispose();
 
-        TileLayer.write(grassLayer, grassLayerFile);
+        if (TileLayer.write(grassLayer, grassLayerFile))
+            Gdx.app.log("AdvancedTilemapsExample", "Tile layer saved to " + grassLayerFile.path());
+        else
+            Gdx.app.error("AdvancedTilemapsExample", "Unable to write tile layer");
     }
 
 }

@@ -140,7 +140,7 @@ public class TileLayer {
         for (int y = 0; y < tilesY; y++) {
             for (boolean[] tile : tiles) {
                 if (tile[y])
-                    bytes[bitIndex / 8] |= (1 << (bitIndex % 8));
+                    bytes[bitIndex / 8] |= (byte) (1 << (bitIndex % 8));
                 bitIndex++;
             }
         }
