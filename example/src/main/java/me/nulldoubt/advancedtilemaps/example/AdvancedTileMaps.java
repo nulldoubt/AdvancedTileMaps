@@ -167,7 +167,7 @@ public class AdvancedTileMaps extends ApplicationAdapter {
 
             @Override
             public boolean scrolled(float amountX, float amountY) {
-                targetZoom += (amountY * 0.5f);
+                targetZoom += (amountY * 0.25f);
                 targetZoom = MathUtils.clamp(targetZoom, 0.1f, 1.5f);
                 return true;
             }
