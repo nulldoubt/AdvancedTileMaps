@@ -6,6 +6,7 @@ import com.badlogic.gdx.Input;
 import com.badlogic.gdx.InputAdapter;
 import com.badlogic.gdx.backends.lwjgl3.Lwjgl3Application;
 import com.badlogic.gdx.backends.lwjgl3.Lwjgl3ApplicationConfiguration;
+import com.badlogic.gdx.files.FileHandle;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.Texture;
@@ -62,6 +63,8 @@ public class AdvancedTilemapsExample extends ApplicationAdapter {
     private Texture grass;
     private Texture grassOverlay;
     private TileLayer grassLayer;
+
+    private FileHandle grassLayerFile;
 
     /*
         and these here are the necessary variables
@@ -182,7 +185,11 @@ public class AdvancedTilemapsExample extends ApplicationAdapter {
         dirtLayer.setOverlay(dirtOverlay, shader);
 
         // initializing our grass tile layer.
-        grassLayer = new TileLayer(64, 64, 16f, 16f, 1f / 16f, false);
+        grassLayerFile = Gdx.files.local("grass_layer.bin");
+        if (grassLayerFile.exists())
+            grassLayer = TileLayer.read(grassLayerFile);
+        else
+            grassLayer = new TileLayer(64, 64, 16f, 16f, 1f / 16f, false);
         grassLayer.setTileSet(new TextureRegion(grass));
         grassLayer.setOverlay(grassOverlay, shader);
 
@@ -345,6 +352,8 @@ public class AdvancedTilemapsExample extends ApplicationAdapter {
         batch.dispose();
 
         font.dispose();
+
+        TileLayer.write(grassLayer, grassLayerFile);
     }
 
 }
