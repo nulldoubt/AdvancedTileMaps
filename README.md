@@ -1,173 +1,188 @@
-Advanced Tilemaps
----
-Ever wondered how you can create awesome, overlayed, auto-tiled, 
-multi-layered, viewport-managed, and efficient tilemaps in libGDX 
-using the **dual grid** system?
+# Advanced Tilemaps
 
-What's the dual-grid system?
----
-The dual-grid system is a basically a mechanism similar to 
-the marching squares algorithm, it allows to test the tile 
-corners using a 4-bit long bitmask, this allows you to automatically 
-set the tile texture based on the 4 corners. Why's that ideal? 
-Well, now you don't have to draw 256 different tile combinations 
-to display a nice tilemap with round edges and corners, that's only 
-if you're testing the tile edges. Instead, you only have to 
-provide a tile-set consisting of 16 different tile combinations 
-which is just suitable for testing using the tile corners. That's 
-a huge amount of work spared for a simple tile layer!
+Ever wondered how you can create **overlayed, auto-tileable, multi-layered, viewport-friendly, efficient, performant,
+and customizable** tilemaps in libGDX with **minimal effort** using the **dual-grid system**?
+
+## What is the Dual-Grid System?
+
+The dual-grid system is a mechanism similar to the **marching squares algorithm**. It allows tile textures to be
+displayed based on their **four cornering neighbors**, using a **4-bit bitmask**.
+
+### Why is this ideal?
+
+With traditional auto-tiling, you’d need **256 different tile combinations** to achieve smooth edges and corners using
+an **8-neighbor system**. However, with the dual-grid approach, you only need **16 tile combinations**, significantly
+reducing the amount of artwork required while still achieving a polished result.
 
 ![Window-Preview.png](media/Window-Preview.png)
 
-The first time I saw the dual-grid system was in an awesome 
-dev-log by [jess::codes](https://www.youtube.com/@jesscodes), 
-she's really an awesome and talented game developer!
+The first time I saw the dual-grid system was in an awesome dev-log
+by [jess::codes](https://www.youtube.com/@jesscodes). She is an incredibly talented game developer!
 
-The mechanisms implemented in this simple game were basically 
-inspired these two videos from her:
-* [Draw fewer tiles - by using a Dual-Grid system!](https://www.youtube.com/watch?v=jEWFSv3ivTg)
-* [Easy texture overlay shader for tilemaps!](https://www.youtube.com/watch?v=eYlBociPwdw)
+This library was largely inspired by these two videos:
 
-Also, just as a side note, the assets used in this repository 
-are copied from her demos: 
-* [dual-grid-tilemap-system-godot](https://github.com/jess-hammer/dual-grid-tilemap-system-godot)
-* [repeated-texture-on-tilemap-demo-godot](https://github.com/jess-hammer/repeated-texture-on-tilemap-demo-godot)
+- [Draw fewer tiles - by using a Dual-Grid system!](https://www.youtube.com/watch?v=jEWFSv3ivTg)
+- [Easy texture overlay shader for tilemaps!](https://www.youtube.com/watch?v=eYlBociPwdw)
+
+Additionally, most assets in this repository are taken from her demos:
+
+- [dual-grid-tilemap-system-godot](https://github.com/jess-hammer/dual-grid-tilemap-system-godot)
+- [repeated-texture-on-tilemap-demo-godot](https://github.com/jess-hammer/repeated-texture-on-tilemap-demo-godot)
 
 Thanks [jess](https://github.com/jess-hammer)!
 
-What does 'overlayed' mean?
----
-Every `TileLayer` uses a [custom shader](/assets/shaders) to render 
-an overlay texture on top of the color mask of the tile-set (which 
-is red by default). This you to have a non-repetitive and seamless 
-texture rendered on your layers, it also enables you to draw art 
-that's bigger than just a single tile in size.
+## Feature Breakdown
 
-What does 'auto-tiled' mean?
----
-Every `TileLayer` utilizes a mechanism to bitmask every tile and 
-change the tile-set index of that tile based on the 4 corners and 
-their surrounding neighbors. This enables the game to automatically 
-display the right tile texture based on the neighbors and that's 
-called auto-tiling.
+### What does "overlayed" mean?
 
-![Auto-Tiling.gif](media/Auto-Tiling.gif)
+Each `TileLayer` can have an optional **overlay shader** to render an **overlay texture** on top of the **color mask**
+of the tile-set (default: red). This helps prevent repetition and allows drawing larger details that span multiple
+tiles.
 
-And what does 'multi-layered' mean?
----
-The approach here is to implement the logic into separate instances 
-of `TileLayer` and then render them in the order you'd like, this allows 
-you to auto-tile multiple tile types in the same map.
+### What does "auto-tileable" mean?
 
-Finally, what does 'viewport-managed' mean?
----
-The game is viewport managed, that means that you don't have to 
-use ANY pixels in your game. The only units you work with are 
-the so-called world units. And you define them!
+Each `TileLayer` uses a bitmasking system to **automatically determine** the correct tile variant based on its **four
+cornering neighbors**. This means you **don’t have to manually place tiles**—the system will handle it for you!
 
-A simple example: Every tile in this game is, actually, **1x1 
-world units** in size. That's ideal because this approach 
-scales well when you're building your game for other platforms 
-with different screen sizes and resolutions.
+![Auto-Tiling.gif](media/Example-Preview.gif)
 
-Maybe a small diagram can help you understand [the code](example/src/main/java/me/nulldoubt/advancedtilemaps/example/AdvancedTileMaps.java#L121-L122)?
+### What does "multi-layered" mean?
+
+The library allows you to **stack multiple tile layers**, enabling independent auto-tiling for different tile types
+within the same map.
+
+### What does "viewport-friendly" mean?
+
+The example is managed using a **viewport system**, meaning that you work with **world units** instead of pixels. This
+ensures **scalability** across different screen sizes and resolutions.
+
+For example, each tile in the example is **1x1 world units**, making the system highly adaptable.
 
 ![Viewport-Diagram.png](media/Viewport-Diagram.png)
 
-The viewport in our case is basically just what defines 
-the part that we want to *see* from the world. But not, 
-actually, the camera is what we see. When you set the 
-camera zoom to 1.0, then you see the whole viewport. 
-*And don't worry, your world may be bigger than the viewport!*
+A viewport defines and manages the coordinate system of your game world, making your game more portable across
+platforms.
 
-How to use the library?
----
-The library consists of a single, configurable class `TileLayer`.
+Every viewport manages a camera which may be freely positioned within the world,
+the camera is often what's visible on the screen.
 
-First, you have to create an instance of that class, 
-using this constructor:
+## How to Use the Library
+
+This library consists of a single, configurable class: `TileLayer`.
+
+### Creating a Tile Layer
+
+You can create a new `TileLayer` instance using:
+
 ```java
 new TileLayer(
-        int tilesX,         // width of the world in tiles
-        int tilesY,         // height of the world in tiles
-        float tileWidth,    // tile width
-        float tileHeight,   // tile height
-        float unitScale,    // unit-scale of the world
-        boolean fill        // initial-state of this layer (should it be empty, or filled?)
+        int tilesX,         // World width in tiles
+        int tilesY,         // World height in tiles
+        float tileWidth,    // Tile width
+        float tileHeight,   // Tile height
+        float unitScale,    // Unit scale of the world
+        boolean fill        // Should the layer start filled?
 );
 ```
-and when you have an instance, you should immediately set the tile-set:
+
+### Setting Up the Tile Set
+
+Once you have an instance, set the tile texture:
+
 ```java
 tileLayer.setTileSet(textureRegion);
 ```
-and, optionally, if you'd like to integrate an overlay into the 
-tileLayer, then you can use this method:
+
+### Adding an Overlay (Optional)
+
+You can integrate an **overlay texture** and an **overlay shader** using:
+
 ```java
 tileLayer.setOverlay(overlayTexture, overlayShader);
 ```
 
-So, now you've finally configured a tile layer, what next?
-In your render pipeline, you'll be able to render the 
-tileLayer using this snippet:
+### Rendering the Tile Layer
+
+In your render pipeline:
+
 ```java
-tileLayer.setView(camera); // We set the view-bounds to the camera (see overloaded methods).
-tileLayer.render(batch); // We render using an instance of a batch.
+tileLayer.setView(camera); // Set view bounds to the camera
+tileLayer.
+
+render(batch);   // Render using a batch
 ```
 
-If you're facing any issues with texture-bleeding, then 
-this library has gotten your back! Play a bit using the 
-`TileLayer.setInsetTolerance(float, float)` method and find 
-the sweet spot for your texture. Depending on your texture 
-size, the inset tolerance should be between 
-`0.001 (>= 4096 pixels)` and `0.05 (<= 16 pixels)`.
+*You may also use the overloaded method `setView(x, y, w, h)` if you don't have a camera.*
 
-If you have a different tile-set layout than the default 
-one (as seen in the example), then you can use the 
-`TileLayer.setAutoTileConfiguration(IntMap<Byte>)` method 
-to provide a custom auto-tile index-mapping. **Note that, 
-as of now, this is a static property and it will modify 
-the configuration of all tile layers.**
+### Handling Texture Bleeding
 
-You can check out the `TileLayer` class and its methods, 
-there are many nice methods that allow you to customize 
-it to your liking and also some getters and setters amongst 
-other utility methods.
+If you experience **texture bleeding**, adjust the inset tolerance:
 
-If you're having trouble with something, or would like to 
-report a bug, request a feature, request an optimization, or 
-anything else, then open an issue here on GitHub.
+```java
+tileLayer.setInsetTolerance(float xTolerance, float yTolerance);
+```
 
-Also, contributions are welcome!
+This allows you to handle texture bleeding properly at runtime, without ever modifying your texture.
 
-How to run the example?
----
-It's really simple, just clone the repository and run 
-it using the gradle-wrapper. Using this command:
+Suggested values:
+
+- `0.001` (for large textures, e.g., `>= 4096px`)
+- `0.05` (for small textures, e.g., `<= 16px`)
+
+### Custom Auto-Tile Configuration
+
+If your tile-set layout differs from the default, you can set a **custom auto-tile index mapping**:
+
+```java
+tileLayer.setAutoTileConfiguration(IntMap<Byte> customMapping);
+```
+
+*Note:* This is currently a **static property**, meaning it applies to all tile layers.
+
+## Library vs. Example
+
+This repository contains both the **library** and an **example project**:
+
+- **Library (`:library` Gradle submodule)**
+    - Contains everything related to the `TileLayer` class.
+    - Located in the [`library`](library) folder.
+    - This is the core functionality meant for integration into your own projects.
+
+- **Example (`:example` Gradle submodule)**
+    - A demonstration of how to use `TileLayer`.
+    - Located in the [`example`](example) folder.
+    - Provides a working implementation showcasing auto-tiling, overlays, and viewport management.
+
+## Running the Example
+
+Clone the repository and run:
+
 ```shell
 ./gradlew clean :example:run
 ```
 
-How to build the library?
----
-Building is simple as well, clone the repository and 
-build the jar file using the gradle-wrapper. Using this command: 
+## Building the Library
+
+To build the library JAR file:
+
 ```shell
 ./gradlew clean :library:jar
 ```
 
-Or even better, this *library* is literally [a single class](library/src/main/java/me/nulldoubt/advancedtilemaps/TileLayer.java), 
-just copy it to your project and done!
+Alternatively, since the **entire library is a single class**, you can simply copy [
+`TileLayer.java`](library/src/main/java/me/nulldoubt/advancedtilemaps/TileLayer.java) into your project.
 
-Future?
----
-I will try my best to maintain this library and fix future 
-bugs, maybe even implement features and optimize it. Pull 
-requests are very welcome.
+## Future Plans
 
-As of now, the TileLayer class is pretty optimized. It can handle 
-large worlds efficiently.
+I will do my best to maintain this library, fix bugs, and possibly add new features and optimizations.
 
-License?
----
-This library (not the example assets!) is public domain.
-By library, I mean everything within the [library](library) folder.
+Pull requests are **highly welcome!**
+
+Currently, `TileLayer` is well-optimized and can efficiently handle **large worlds**.
+
+## License
+
+This library (excluding example assets) is **public domain**.
+
+Everything inside the [`library`](library) folder is **free to use** without restrictions.
+
