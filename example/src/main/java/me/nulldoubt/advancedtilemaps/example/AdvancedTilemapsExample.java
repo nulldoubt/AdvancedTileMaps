@@ -122,6 +122,7 @@ public class AdvancedTilemapsExample extends ApplicationAdapter {
     private BitmapFont font;
     private BitmapFontCache fontCache;
 
+    private boolean debug;
     private int drawCalls;
 
     private final Vector2 cameraVelocity = new Vector2();
@@ -193,6 +194,14 @@ public class AdvancedTilemapsExample extends ApplicationAdapter {
 
         // setting the default input processor.
         Gdx.input.setInputProcessor(new InputAdapter() {
+
+            @Override
+            public boolean keyDown(int keycode) {
+                if (keycode != Input.Keys.F2)
+                    return false;
+                debug = !debug;
+                return true;
+            }
 
             @Override
             public boolean scrolled(float amountX, float amountY) {
@@ -288,7 +297,8 @@ public class AdvancedTilemapsExample extends ApplicationAdapter {
         batch.setProjectionMatrix(worldCamera.combined);
         batch.begin(); // begin the batch.
         renderWorld(batch);
-        renderInterface(batch);
+        if (debug)
+            renderInterface(batch);
         batch.end(); // end the batch.
     }
 
