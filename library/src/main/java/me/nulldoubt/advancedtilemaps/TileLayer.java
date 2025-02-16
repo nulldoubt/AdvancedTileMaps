@@ -489,8 +489,8 @@ public class TileLayer {
         };
 
         public static String nameOf(RenderStrategy renderStrategy) {
-            if (renderStrategy instanceof IntegratedStrategy integratedStrategy)
-                return integratedStrategy.name();
+            if (renderStrategy instanceof TileLayer.IntegratedStrategy)
+                return ((TileLayer.IntegratedStrategy) renderStrategy).name();
             return renderStrategy.getClass().getSimpleName();
         }
 
