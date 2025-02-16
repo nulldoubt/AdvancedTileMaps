@@ -14,6 +14,7 @@ import com.badlogic.gdx.graphics.g2d.*;
 import com.badlogic.gdx.graphics.glutils.ShaderProgram;
 import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Vector2;
+import com.badlogic.gdx.utils.Align;
 import com.badlogic.gdx.utils.ScreenUtils;
 import com.badlogic.gdx.utils.viewport.*;
 import me.nulldoubt.advancedtilemaps.TileLayer;
@@ -50,6 +51,16 @@ public class AdvancedTilemapsExample extends ApplicationAdapter {
 
         FPS: [MAGENTA]%d[]
         Draw-Calls: [MAGENTA]%d[]
+        """;
+
+    private static final String hotkeysInfo = """
+        Movement: [GOLDENROD]W, A, S, D[]
+        Zooming: [GOLDENROD]Mouse-Wheel[]
+
+        Place Tile: [GOLDENROD]Left-Click[]
+        Remove Tile: [GOLDENROD]Right-Click[]
+
+        Toggle Debug: [GOLDENROD]F2[]
         """;
 
     // These here are the variables for our 'dirt' tile layer.
@@ -233,6 +244,7 @@ public class AdvancedTilemapsExample extends ApplicationAdapter {
             }
         });
 
+        debug = true;
         font = new BitmapFont();
         font.getData().markupEnabled = true;
         fontCache = font.newFontCache();
@@ -253,7 +265,6 @@ public class AdvancedTilemapsExample extends ApplicationAdapter {
         ScreenUtils.clear(Color.BLACK); // clear the screen.
 
         final float delta = Gdx.graphics.getDeltaTime();
-
         if (targetZoom != worldCamera.zoom)
             worldCamera.zoom = MathUtils.lerp(worldCamera.zoom, targetZoom, delta * zoomSpeed);
 
@@ -333,6 +344,13 @@ public class AdvancedTilemapsExample extends ApplicationAdapter {
             Gdx.graphics.getFramesPerSecond(),
             drawCalls
         ), 15f, Gdx.graphics.getHeight() - 20f);
+        fontCache.addText(
+            hotkeysInfo,
+            Gdx.graphics.getWidth() - 20f,
+            Gdx.graphics.getHeight() - 20f,
+            0, hotkeysInfo.length(), 0,
+            Align.right, false, null
+        );
         fontCache.draw(batch);
     }
 
