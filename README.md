@@ -147,7 +147,7 @@ integrated as of now:
 * `IntegratedStrategy.VIEW_TILES_ALL_QUADS` will render visible tiles but all quads.
 * (default) `IntegratedStrategy.VIEW_TILES_VIEW_QUADS` will render visible tiles and only visible quads.
 
-*Visible quads are the ones associated with bitmask 0 in the auto-tile configuration.*
+*Invisible quads are the ones associated with bitmask 0 in the auto-tile configuration.*
 
 **You can also provide your own implementation of the `RenderStrategy` interface.**
 
@@ -167,9 +167,7 @@ You may *write* your tile layer to a file handle or an output stream like this:
 
 ```java
 TileLayer.write(tileLayer, fileHandle); // write to a file handle.
-TileLayer.
-
-write(tileLayer, outputStream); // write to an output stream.
+TileLayer.write(tileLayer, outputStream); // write to an output stream.
 ```
 
 And you may *read* your tile layer from a file handle or an input stream like this:
