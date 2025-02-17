@@ -44,7 +44,9 @@ tiles.
 Each `TileLayer` uses a bitmasking system to **automatically determine** the correct tile variant based on its **four
 cornering neighbors**. This means you **don’t have to manually place tiles**—the system will handle it for you!
 
-![Auto-Tiling.gif](media/Example-Preview.gif)
+**Here's a little showcase of the example included (press to play the video):**
+
+![Showcase.mp4](media/Showcase.mp4
 
 ### What does "multi-layered" mean?
 
