@@ -12,7 +12,9 @@ import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.*;
 import com.badlogic.gdx.graphics.glutils.ShaderProgram;
+import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.MathUtils;
+import com.badlogic.gdx.math.Rectangle;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.utils.Align;
 import com.badlogic.gdx.utils.ScreenUtils;
@@ -61,6 +63,9 @@ public class AdvancedTilemapsExample extends ApplicationAdapter {
         Remove Tile: [GOLDENROD]Right-Click[]
 
         Toggle Debug: [GOLDENROD]F2[]
+        Toggle Grid: [GOLDENROD]F3[]
+
+        Exit: [GOLDENROD]Escape[]
         """;
 
     // These here are the variables for our 'dirt' tile layer.
@@ -80,6 +85,7 @@ public class AdvancedTilemapsExample extends ApplicationAdapter {
         for us to draw the tile layers.
     */
     private SpriteBatch batch;
+    private ShapeRenderer shapes;
     private ShaderProgram shader;
 
     /*
@@ -134,6 +140,7 @@ public class AdvancedTilemapsExample extends ApplicationAdapter {
     private BitmapFontCache fontCache;
 
     private boolean debug;
+    private boolean grid;
     private int drawCalls;
 
     private final Vector2 cameraVelocity = new Vector2();
@@ -180,6 +187,7 @@ public class AdvancedTilemapsExample extends ApplicationAdapter {
 
         // creating our sprite-batch.
         batch = new SpriteBatch(3000);
+        shapes = new ShapeRenderer();
 
         // creating our viewport, with our world bounds being of the same aspect-ratio of our native resolution.
         worldViewport = new FitViewport(40f, 22.5f);
@@ -208,9 +216,17 @@ public class AdvancedTilemapsExample extends ApplicationAdapter {
 
             @Override
             public boolean keyDown(int keycode) {
-                if (keycode != Input.Keys.F2)
+                if (keycode == Input.Keys.ESCAPE) {
+                    Gdx.app.exit();
+                    return true;
+                }
+                final boolean f2 = keycode == Input.Keys.F2;
+                if (!f2 && keycode != Input.Keys.F3)
                     return false;
-                debug = !debug;
+                if (f2)
+                    debug = !debug;
+                else
+                    grid = !grid;
                 return true;
             }
 
@@ -261,7 +277,7 @@ public class AdvancedTilemapsExample extends ApplicationAdapter {
 
     @Override
     public void render() {
-        drawCalls = batch.renderCalls;
+        drawCalls = batch.renderCalls + (grid ? 1 : 0);
         ScreenUtils.clear(Color.BLACK); // clear the screen.
 
         final float delta = Gdx.graphics.getDeltaTime();
@@ -311,6 +327,12 @@ public class AdvancedTilemapsExample extends ApplicationAdapter {
         if (debug)
             renderInterface(batch);
         batch.end(); // end the batch.
+        if (grid) {
+            shapes.setProjectionMatrix(worldCamera.combined);
+            shapes.begin(ShapeRenderer.ShapeType.Line);
+            renderGrid(shapes);
+            shapes.end();
+        }
     }
 
     private void renderWorld(Batch batch) {
@@ -354,6 +376,17 @@ public class AdvancedTilemapsExample extends ApplicationAdapter {
         fontCache.draw(batch);
     }
 
+    private void renderGrid(ShapeRenderer shapes) {
+        final Rectangle view = grassLayer.getViewBounds();
+        final float startX = MathUtils.floor(view.x / grassLayer.getTileWidth()) * grassLayer.getTileWidth();
+        final float startY = MathUtils.floor(view.y / grassLayer.getTileHeight()) * grassLayer.getTileHeight();
+        final float endX = Math.min(view.x + view.width, grassLayer.getTilesX() * grassLayer.getTileWidth());
+        final float endY = Math.min(view.y + view.height, grassLayer.getTilesY() * grassLayer.getTileHeight());
+        for (float x = startX; x < endX; x++)
+            for (float y = startY; y < endY; y++)
+                shapes.rect(x, y, 1f, 1f);
+    }
+
     @Override
     public void resize(final int width, final int height) {
         /*
@@ -378,6 +411,7 @@ public class AdvancedTilemapsExample extends ApplicationAdapter {
 
         shader.dispose();
         batch.dispose();
+        shapes.dispose();
 
         font.dispose();
 
