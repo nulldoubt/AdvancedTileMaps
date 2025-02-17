@@ -46,7 +46,7 @@ cornering neighbors**. This means you **donâ€™t have to manually place tiles**â€
 
 **Here's a little showcase of the example included (press to play the video):**
 
-![Showcase.mp4](media/Showcase.mp4
+![Showcase.mp4](media/Showcase.mp4)
 
 ### What does "multi-layered" mean?
 
