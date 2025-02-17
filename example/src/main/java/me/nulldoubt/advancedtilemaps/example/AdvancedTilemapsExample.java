@@ -139,6 +139,7 @@ public class AdvancedTilemapsExample extends ApplicationAdapter {
     private BitmapFont font;
     private BitmapFontCache fontCache;
 
+    private Color cursorColor;
     private boolean debug;
     private boolean grid;
     private int drawCalls;
@@ -249,6 +250,7 @@ public class AdvancedTilemapsExample extends ApplicationAdapter {
             public boolean touchDown(final int screenX, final int screenY, final int pointer, final int button) {
                 _buttonRight = (button == Input.Buttons.RIGHT);
                 _touchDown = true;
+                cursorColor = _buttonRight ? Color.RED : Color.GREEN;
                 handleTile(screenX, screenY);
                 return true;
             }
@@ -256,9 +258,12 @@ public class AdvancedTilemapsExample extends ApplicationAdapter {
             @Override
             public boolean touchUp(int screenX, int screenY, int pointer, int button) {
                 _touchDown = false;
+                cursorColor = Color.ORANGE;
                 return true;
             }
         });
+
+        cursorColor = Color.ORANGE;
 
         debug = true;
         font = new BitmapFont();
@@ -277,7 +282,7 @@ public class AdvancedTilemapsExample extends ApplicationAdapter {
 
     @Override
     public void render() {
-        drawCalls = batch.renderCalls + (grid ? 1 : 0);
+        drawCalls = batch.renderCalls + 1;
         ScreenUtils.clear(Color.BLACK); // clear the screen.
 
         final float delta = Gdx.graphics.getDeltaTime();
@@ -327,12 +332,13 @@ public class AdvancedTilemapsExample extends ApplicationAdapter {
         if (debug)
             renderInterface(batch);
         batch.end(); // end the batch.
-        if (grid) {
-            shapes.setProjectionMatrix(worldCamera.combined);
-            shapes.begin(ShapeRenderer.ShapeType.Line);
+
+        shapes.setProjectionMatrix(worldCamera.combined);
+        shapes.begin(ShapeRenderer.ShapeType.Line);
+        if (grid)
             renderGrid(shapes);
-            shapes.end();
-        }
+        renderCursor(shapes);
+        shapes.end();
     }
 
     private void renderWorld(Batch batch) {
@@ -382,9 +388,20 @@ public class AdvancedTilemapsExample extends ApplicationAdapter {
         final float startY = MathUtils.floor(view.y / grassLayer.getTileHeight()) * grassLayer.getTileHeight();
         final float endX = Math.min(view.x + view.width, grassLayer.getTilesX() * grassLayer.getTileWidth());
         final float endY = Math.min(view.y + view.height, grassLayer.getTilesY() * grassLayer.getTileHeight());
+        shapes.setColor(Color.WHITE);
         for (float x = startX; x < endX; x++)
             for (float y = startY; y < endY; y++)
                 shapes.rect(x, y, 1f, 1f);
+    }
+
+    private void renderCursor(ShapeRenderer shapes) {
+        final Vector2 touch = worldViewport.unproject(temp.set(Gdx.input.getX(), Gdx.input.getY()));
+        shapes.setColor(cursorColor);
+        shapes.rect(
+            MathUtils.floor(touch.x),
+            MathUtils.floor(touch.y),
+            1f, 1f
+        );
     }
 
     @Override
