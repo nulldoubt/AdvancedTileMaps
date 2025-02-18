@@ -141,17 +141,17 @@ TileLayer.setAutoTileConfiguration(IntMap<Byte> configuration);
 
 ### Rendering Strategies
 
-You may experiment with different `RenderStrategy` for your tilemap, there are 4 rendering strategies
-integrated as of now:
+You may experiment with different `IRenderStrategy` implementations for your tilemap, there are 4 
+rendering strategies integrated as of now:
 
-* `IntegratedStrategy.ALL_TILES_ALL_QUADS` will render all tiles and all quads.
-* `IntegratedStrategy.ALL_TILES_VIEW_QUADS` will render all tiles but only visible quads.
-* `IntegratedStrategy.VIEW_TILES_ALL_QUADS` will render visible tiles but all quads.
-* (default) `IntegratedStrategy.VIEW_TILES_VIEW_QUADS` will render visible tiles and only visible quads.
+* `RenderStrategy.ALL_TILES_ALL_QUADS` will render all tiles and all quads.
+* `RenderStrategy.ALL_TILES_VIEW_QUADS` will render all tiles but only visible quads.
+* `RenderStrategy.VIEW_TILES_ALL_QUADS` will render visible tiles but all quads.
+* (default) `RenderStrategy.VIEW_TILES_VIEW_QUADS` will render visible tiles and only visible quads.
 
 *Invisible quads are the ones associated with bitmask 0 in the auto-tile configuration.*
 
-**You can also provide your own implementation of the `RenderStrategy` interface.**
+**You can also provide your own implementation of the `IRenderStrategy` interface.**
 
 You may change the current tile layer rendering strategy like this:
 
