@@ -12,12 +12,14 @@ import com.badlogic.gdx.utils.*;
 
 import java.io.*;
 import java.util.Arrays;
+import java.util.function.Supplier;
 
 public class TileLayer {
 
     private static final IntMap<Byte> configuration;
     private static final GridPoint2[] neighbors;
 
+    private static Supplier<ICompressionStrategy> customCompressionStrategySupplier;
     private static ICompressionStrategy defaultCompressionStrategy;
     private static IRenderStrategy defaultRenderStrategy;
     private static float insetToleranceX;
@@ -82,6 +84,10 @@ public class TileLayer {
         TileLayer.defaultCompressionStrategy = defaultCompressionStrategy;
     }
 
+    public static void setCustomCompressionStrategySupplier(Supplier<ICompressionStrategy> customCompressionStrategySupplier) {
+        TileLayer.customCompressionStrategySupplier = customCompressionStrategySupplier;
+    }
+
     /* Serialization methods */
     public static TileLayer read(FileHandle fileHandle) {
         return read(fileHandle.read());
@@ -106,10 +112,13 @@ public class TileLayer {
             tileLayer.setRenderStrategy(RenderStrategy.fromIndex(root.getByte("renderStrategy")));
         if (root.has("compressionStrategy"))
             tileLayer.setCompressionStrategy(CompressionStrategy.fromIndex(root.getByte("compressionStrategy")));
+        else if (customCompressionStrategySupplier == null)
+            throw new IllegalStateException("Custom compression strategy supplier not set");
+        else
+            tileLayer.setCompressionStrategy(customCompressionStrategySupplier.get());
 
         boolean[][] tiles;
         try {
-            // This will produce a NPE with custom strategies.
             tiles = tileLayer.compressionStrategy.decompress(root.get("tiles").asByteArray(), tileLayer.tilesX, tileLayer.tilesY);
         } catch (IOException e) {
             throw new GdxRuntimeException("Unable to decompress tile layer", e);
