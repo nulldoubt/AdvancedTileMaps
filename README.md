@@ -199,13 +199,41 @@ this library:
 
 | Strategy                   |                         Suggestion                          | Bits per tile <br/>(Worst case) |
 |:---------------------------|:-----------------------------------------------------------:|:-------------------------------:|
-| **BIT_COMPRESSION**        | Good for large layers with <br/>many randomly placed tiles. |              1 Bit              |
+| **BIT_COMPRESSION** (raw)  | Good for large layers with <br/>many randomly placed tiles. |              1 Bit              |
 | **SPARSE_COMPRESSION**     |    Good for small layers with <br/>little tiles placed.     |             32 Bit              |
 | **RUN_LENGTH_COMPRESSION** |  Good for layers of all sizes <br/>with row-placed tiles.   |             ~17 Bit             |
 
-These implementations can be found in the `TileLayer.CompressionStrategy` enum.
+These implementations can be found in the `TileLayer.CompressionStrategy` enum. This library chooses the
+`RUN_LENGTH_COMPRESSION` strategy as the default compression strategy.
 
-This library chooses the `RUN_LENGTH_COMPRESSION` strategy as the default compression strategy.
+#### How do the compression strategies perform?
+
+Well, here are some simple non-realistic benchmark metrics: How much space does
+it take to save different sizes of a tile layer?
+
+| Compression                | Type    |      Tiles |   Bytes   |
+|:---------------------------|---------|-----------:|:---------:|
+| **BIT_COMPRESSION**        | _Empty_ |      4,096 |    665    |
+|                            | _Empty_ |     16,384 |   2,201   |
+|                            | _Empty_ |     65,536 |   8,345   |
+|                            | _Empty_ |    262,144 |  32,921   |
+|                            | _Empty_ |  1,048,576 |  131,225  |
+|                            | _Empty_ |  4,194,304 |  524,441  |
+|                            | _Empty_ | 16,777,216 | 2,097,305 |
+| **SPARSE_COMPRESSION**     | _Empty_ |      4,096 |    153    |
+|                            | _Empty_ |     16,384 |    153    |
+|                            | _Empty_ |     65,536 |    153    |
+|                            | _Empty_ |    262,144 |    153    |
+|                            | _Empty_ |  1,048,576 |    153    |
+|                            | _Empty_ |  4,194,304 |    153    |
+|                            | _Empty_ | 16,777,216 |    153    |
+| **RUN_LENGTH_COMPRESSION** | _Empty_ |      4,096 |    156    |
+|                            | _Empty_ |     16,384 |    156    |
+|                            | _Empty_ |     65,536 |    156    |
+|                            | _Empty_ |    262,144 |    156    |
+|                            | _Empty_ |  1,048,576 |    156    |
+|                            | _Empty_ |  4,194,304 |    156    |
+|                            | _Empty_ | 16,777,216 |    156    |
 
 **You may also provide your own implementation of the `ICompressionStrategy` interface.**
 
