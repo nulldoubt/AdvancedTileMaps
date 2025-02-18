@@ -18,8 +18,8 @@ public class TileLayer {
     private static final IntMap<Byte> configuration;
     private static final GridPoint2[] neighbors;
 
-    private static CompressionStrategy defaultCompressionStrategy;
-    private static RenderStrategy defaultRenderStrategy;
+    private static ICompressionStrategy defaultCompressionStrategy;
+    private static IRenderStrategy defaultRenderStrategy;
     private static float insetToleranceX;
     private static float insetToleranceY;
     private static byte zeroIndex;
@@ -49,7 +49,7 @@ public class TileLayer {
         };
 
         defaultCompressionStrategy = CompressionStrategy.BIT_COMPRESSED;
-        defaultRenderStrategy = IntegratedStrategy.VIEW_TILES_VIEW_QUADS;
+        defaultRenderStrategy = RenderStrategy.VIEW_TILES_VIEW_QUADS;
         insetToleranceX = 0.01f;
         insetToleranceY = 0.01f;
     }
@@ -66,19 +66,19 @@ public class TileLayer {
         TileLayer.insetToleranceY = insetToleranceY;
     }
 
-    public static RenderStrategy getDefaultRenderStrategy() {
+    public static IRenderStrategy getDefaultRenderStrategy() {
         return defaultRenderStrategy;
     }
 
-    public static void setDefaultRenderStrategy(RenderStrategy defaultRenderStrategy) {
+    public static void setDefaultRenderStrategy(IRenderStrategy defaultRenderStrategy) {
         TileLayer.defaultRenderStrategy = defaultRenderStrategy;
     }
 
-    public static CompressionStrategy getDefaultCompressionStrategy() {
+    public static ICompressionStrategy getDefaultCompressionStrategy() {
         return defaultCompressionStrategy;
     }
 
-    public static void setDefaultCompressionStrategy(CompressionStrategy defaultCompressionStrategy) {
+    public static void setDefaultCompressionStrategy(ICompressionStrategy defaultCompressionStrategy) {
         TileLayer.defaultCompressionStrategy = defaultCompressionStrategy;
     }
 
@@ -92,7 +92,6 @@ public class TileLayer {
         reader.oldFormat = false;
 
         final JsonValue root = reader.parse(inputStream);
-
         final TileLayer tileLayer = new TileLayer(
             root.getInt("tilesX"),
             root.getInt("tilesY"),
@@ -102,11 +101,15 @@ public class TileLayer {
             false
         );
         tileLayer.setOverlayScale(root.getFloat("overlayScale"));
-        tileLayer.setRenderStrategy(IntegratedStrategy.valueOf(root.getString("renderStrategy")));
-        tileLayer.setCompressionStrategy(CompressionStrategy.fromIndex(root.getByte("compressionStrategy")));
+
+        if (root.has("renderStrategy"))
+            tileLayer.setRenderStrategy(RenderStrategy.fromIndex(root.getByte("renderStrategy")));
+        if (root.has("compressionStrategy"))
+            tileLayer.setCompressionStrategy(CompressionStrategy.fromIndex(root.getByte("compressionStrategy")));
 
         boolean[][] tiles;
         try {
+            // This will produce a NPE with custom strategies.
             tiles = tileLayer.compressionStrategy.decompress(root.get("tiles").asByteArray(), tileLayer.tilesX, tileLayer.tilesY);
         } catch (IOException e) {
             throw new GdxRuntimeException("Unable to decompress tile layer", e);
@@ -131,10 +134,15 @@ public class TileLayer {
                 .set("tileWidth", tileLayer.tileWidth)
                 .set("tileHeight", tileLayer.tileHeight)
                 .set("overlayScale", tileLayer.overlayScale)
-                .set("unitScale", tileLayer.unitScale)
-                .set("renderStrategy", IntegratedStrategy.nameOf(tileLayer.renderStrategy))
-                .set("compressionStrategy", tileLayer.compressionStrategy.index)
-                .set("tiles", tileLayer.compressionStrategy.compress(tileLayer.tiles, tileLayer.tilesX, tileLayer.tilesY))
+                .set("unitScale", tileLayer.unitScale);
+
+            if (tileLayer.renderStrategy instanceof RenderStrategy)
+                writer.set("renderStrategy", ((RenderStrategy) tileLayer.renderStrategy).index);
+
+            if (tileLayer.compressionStrategy instanceof CompressionStrategy)
+                writer.set("compressionStrategy", ((CompressionStrategy) tileLayer.compressionStrategy).index);
+
+            writer.set("tiles", tileLayer.compressionStrategy.compress(tileLayer.tiles, tileLayer.tilesX, tileLayer.tilesY))
                 .pop()
                 .flush();
             return true;
@@ -166,8 +174,8 @@ public class TileLayer {
     private final boolean[][] tiles;
     private final byte[][] indices;
 
-    private RenderStrategy renderStrategy;
-    private CompressionStrategy compressionStrategy;
+    private IRenderStrategy renderStrategy;
+    private ICompressionStrategy compressionStrategy;
     private int tilesRendered;
     private int quadsRendered;
 
@@ -288,19 +296,19 @@ public class TileLayer {
         return quadsRendered;
     }
 
-    public RenderStrategy getRenderStrategy() {
+    public IRenderStrategy getRenderStrategy() {
         return renderStrategy;
     }
 
-    public void setRenderStrategy(RenderStrategy renderStrategy) {
+    public void setRenderStrategy(IRenderStrategy renderStrategy) {
         this.renderStrategy = renderStrategy;
     }
 
-    public CompressionStrategy getCompressionStrategy() {
+    public ICompressionStrategy getCompressionStrategy() {
         return compressionStrategy;
     }
 
-    public void setCompressionStrategy(CompressionStrategy compressionStrategy) {
+    public void setCompressionStrategy(ICompressionStrategy compressionStrategy) {
         this.compressionStrategy = compressionStrategy;
     }
 
@@ -375,9 +383,9 @@ public class TileLayer {
             batch.setShader(null);
     }
 
-    public enum IntegratedStrategy implements RenderStrategy {
+    public enum RenderStrategy implements IRenderStrategy {
 
-        ALL_TILES_ALL_QUADS() {
+        ALL_TILES_ALL_QUADS((byte) 0) {
             @Override
             public void render(TileLayer tileLayer, Batch batch) {
                 final float tileWidth = tileLayer.tileWidth * tileLayer.unitScale;
@@ -399,7 +407,7 @@ public class TileLayer {
             }
         },
 
-        ALL_TILES_VIEW_QUADS() {
+        ALL_TILES_VIEW_QUADS((byte) 1) {
             @Override
             public void render(TileLayer tileLayer, Batch batch) {
                 final float tileWidth = tileLayer.tileWidth * tileLayer.unitScale;
@@ -425,7 +433,7 @@ public class TileLayer {
             }
         },
 
-        VIEW_TILES_ALL_QUADS() {
+        VIEW_TILES_ALL_QUADS((byte) 2) {
             @Override
             public void render(TileLayer tileLayer, Batch batch) {
                 final float tileWidth = tileLayer.tileWidth * tileLayer.unitScale;
@@ -451,7 +459,7 @@ public class TileLayer {
             }
         },
 
-        VIEW_TILES_VIEW_QUADS() {
+        VIEW_TILES_VIEW_QUADS((byte) 3) {
             @Override
             public void render(TileLayer tileLayer, Batch batch) {
                 final float tileWidth = tileLayer.tileWidth * tileLayer.unitScale;
@@ -481,21 +489,34 @@ public class TileLayer {
             }
         };
 
-        public static String nameOf(RenderStrategy renderStrategy) {
-            if (renderStrategy instanceof TileLayer.IntegratedStrategy)
-                return ((TileLayer.IntegratedStrategy) renderStrategy).name();
-            return renderStrategy.getClass().getSimpleName();
+        private final byte index;
+
+        RenderStrategy(byte index) {
+            this.index = index;
+        }
+
+        public static RenderStrategy fromIndex(byte b) {
+            if (b == 0)
+                return RenderStrategy.ALL_TILES_ALL_QUADS;
+            else if (b == 1)
+                return RenderStrategy.ALL_TILES_VIEW_QUADS;
+            else if (b == 2)
+                return RenderStrategy.VIEW_TILES_ALL_QUADS;
+            else if (b == 3)
+                return RenderStrategy.VIEW_TILES_VIEW_QUADS;
+            else
+                throw new IllegalArgumentException("Unknown render strategy: " + b);
         }
 
     }
 
-    public interface RenderStrategy {
+    public interface IRenderStrategy {
 
         void render(TileLayer tileLayer, Batch batch);
 
     }
 
-    public enum CompressionStrategy {
+    public enum CompressionStrategy implements ICompressionStrategy {
 
         BIT_COMPRESSED((byte) 0) {
             @Override
@@ -606,15 +627,11 @@ public class TileLayer {
             }
         };
 
-        protected final byte index;
+        private final byte index;
 
         CompressionStrategy(byte index) {
             this.index = index;
         }
-
-        public abstract byte[] compress(boolean[][] tiles, int tilesX, int tilesY) throws IOException;
-
-        public abstract boolean[][] decompress(byte[] bytes, int tilesX, int tilesY) throws IOException;
 
         public static CompressionStrategy fromIndex(byte b) {
             if (b == 0)
@@ -626,6 +643,14 @@ public class TileLayer {
             else
                 throw new IllegalArgumentException("Unknown compression strategy: " + b);
         }
+
+    }
+
+    public interface ICompressionStrategy {
+
+        byte[] compress(boolean[][] tiles, int tilesX, int tilesY) throws IOException;
+
+        boolean[][] decompress(byte[] bytes, int tilesX, int tilesY) throws IOException;
 
     }
 
