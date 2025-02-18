@@ -8,14 +8,9 @@ import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.graphics.glutils.ShaderProgram;
 import com.badlogic.gdx.math.GridPoint2;
 import com.badlogic.gdx.math.Rectangle;
-import com.badlogic.gdx.utils.IntMap;
-import com.badlogic.gdx.utils.JsonValue;
-import com.badlogic.gdx.utils.UBJsonReader;
-import com.badlogic.gdx.utils.UBJsonWriter;
+import com.badlogic.gdx.utils.*;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
+import java.io.*;
 import java.util.Arrays;
 
 public class TileLayer {
@@ -23,6 +18,7 @@ public class TileLayer {
     private static final IntMap<Byte> configuration;
     private static final GridPoint2[] neighbors;
 
+    private static CompressionStrategy defaultCompressionStrategy;
     private static RenderStrategy defaultRenderStrategy;
     private static float insetToleranceX;
     private static float insetToleranceY;
@@ -52,6 +48,7 @@ public class TileLayer {
             new GridPoint2(0, 1), new GridPoint2(1, 1)
         };
 
+        defaultCompressionStrategy = CompressionStrategy.BIT_COMPRESSED;
         defaultRenderStrategy = IntegratedStrategy.VIEW_TILES_VIEW_QUADS;
         insetToleranceX = 0.01f;
         insetToleranceY = 0.01f;
@@ -77,6 +74,14 @@ public class TileLayer {
         TileLayer.defaultRenderStrategy = defaultRenderStrategy;
     }
 
+    public static CompressionStrategy getDefaultCompressionStrategy() {
+        return defaultCompressionStrategy;
+    }
+
+    public static void setDefaultCompressionStrategy(CompressionStrategy defaultCompressionStrategy) {
+        TileLayer.defaultCompressionStrategy = defaultCompressionStrategy;
+    }
+
     /* Serialization methods */
     public static TileLayer read(FileHandle fileHandle) {
         return read(fileHandle.read());
@@ -99,7 +104,12 @@ public class TileLayer {
         tileLayer.setOverlayScale(root.getFloat("overlayScale"));
         tileLayer.setRenderStrategy(IntegratedStrategy.valueOf(root.getString("renderStrategy")));
 
-        boolean[][] tiles = _decompress(root.get("tiles").asByteArray(), tileLayer.tilesX, tileLayer.tilesY);
+        boolean[][] tiles;
+        try {
+            tiles = defaultCompressionStrategy.decompress(root.get("tiles").asByteArray(), tileLayer.tilesX, tileLayer.tilesY);
+        } catch (IOException e) {
+            throw new GdxRuntimeException("Unable to decompress tile layer", e);
+        }
         for (int x = 0; x < tileLayer.tilesX; x++)
             for (int y = 0; y < tileLayer.tilesY; y++)
                 tileLayer.tileAt(x, y, tiles[x][y]);
@@ -122,42 +132,13 @@ public class TileLayer {
                 .set("overlayScale", tileLayer.overlayScale)
                 .set("unitScale", tileLayer.unitScale)
                 .set("renderStrategy", IntegratedStrategy.nameOf(tileLayer.renderStrategy))
-                .set("tiles", _compress(tileLayer.tiles, tileLayer.tilesX, tileLayer.tilesY))
+                .set("tiles", defaultCompressionStrategy.compress(tileLayer.tiles, tileLayer.tilesX, tileLayer.tilesY))
                 .pop()
                 .flush();
             return true;
         } catch (IOException e) {
-            return false;
+            throw new GdxRuntimeException("Unable to compress tile layer", e);
         }
-    }
-
-    private static byte[] _compress(boolean[][] tiles, int tilesX, int tilesY) {
-        int totalBits = tilesX * tilesY;
-        int totalBytes = (totalBits + 7) / 8;
-        byte[] bytes = new byte[totalBytes];
-
-        int bitIndex = 0;
-        for (int y = 0; y < tilesY; y++) {
-            for (boolean[] tile : tiles) {
-                if (tile[y])
-                    bytes[bitIndex / 8] |= (byte) (1 << (bitIndex % 8));
-                bitIndex++;
-            }
-        }
-        return bytes;
-    }
-
-    private static boolean[][] _decompress(byte[] bytes, int tilesX, int tilesY) {
-        boolean[][] tiles = new boolean[tilesX][tilesY];
-
-        int bitIndex = 0;
-        for (int y = 0; y < tilesY; y++) {
-            for (int x = 0; x < tilesX; x++) {
-                tiles[x][y] = (bytes[bitIndex / 8] & (1 << (bitIndex % 8))) != 0;
-                bitIndex++;
-            }
-        }
-        return tiles;
     }
 
     private final TextureRegion[] tileSet;
@@ -499,6 +480,123 @@ public class TileLayer {
     public interface RenderStrategy {
 
         void render(TileLayer tileLayer, Batch batch);
+
+    }
+
+    public enum CompressionStrategy {
+
+        BIT_COMPRESSED() {
+            @Override
+            public byte[] compress(boolean[][] tiles, int tilesX, int tilesY) {
+                int totalBits = tilesX * tilesY;
+                int totalBytes = (totalBits + 7) / 8;
+                byte[] bytes = new byte[totalBytes];
+
+                int bitIndex = 0;
+                for (int y = 0; y < tilesY; y++) {
+                    for (boolean[] tile : tiles) {
+                        if (tile[y])
+                            bytes[bitIndex / 8] |= (byte) (1 << (bitIndex % 8));
+                        bitIndex++;
+                    }
+                }
+                return bytes;
+            }
+
+            @Override
+            public boolean[][] decompress(byte[] bytes, int tilesX, int tilesY) {
+                boolean[][] tiles = new boolean[tilesX][tilesY];
+
+                int bitIndex = 0;
+                for (int y = 0; y < tilesY; y++) {
+                    for (int x = 0; x < tilesX; x++) {
+                        tiles[x][y] = (bytes[bitIndex / 8] & (1 << (bitIndex % 8))) != 0;
+                        bitIndex++;
+                    }
+                }
+                return tiles;
+            }
+        },
+        SPARSE_COMPRESSED() {
+            @Override
+            public byte[] compress(boolean[][] tiles, int tilesX, int tilesY) throws IOException {
+                final ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+                final DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
+                for (int x = 0; x < tilesX; x++)
+                    for (int y = 0; y < tilesY; y++) {
+                        if (tiles[x][y]) {
+                            dataOutputStream.writeShort(x);
+                            dataOutputStream.writeShort(y);
+                        }
+                    }
+                final byte[] buffer = byteArrayOutputStream.toByteArray();
+                dataOutputStream.close();
+                return buffer;
+            }
+
+            @Override
+            public boolean[][] decompress(byte[] bytes, int tilesX, int tilesY) throws IOException {
+                final boolean[][] tiles = new boolean[tilesX][tilesY];
+                final ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(bytes);
+                final DataInputStream dataInputStream = new DataInputStream(byteArrayInputStream);
+                while (dataInputStream.available() > 0) {
+                    int x = dataInputStream.readShort();
+                    int y = dataInputStream.readShort();
+                    tiles[x][y] = true;
+                }
+                return tiles;
+            }
+        },
+        RUN_LENGTH_COMPRESSED() {
+            @Override
+            public byte[] compress(boolean[][] tiles, int tilesX, int tilesY) throws IOException {
+                final ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+                final DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
+                boolean lastValue = tiles[0][0];
+                int count = 0;
+                for (int y = 0; y < tilesY; y++) {
+                    for (int x = 0; x < tilesX; x++) {
+                        if (tiles[x][y] == lastValue) {
+                            count++;
+                        } else {
+                            dataOutputStream.writeBoolean(lastValue);
+                            dataOutputStream.writeShort(count);
+                            lastValue = tiles[x][y];
+                            count = 1;
+                        }
+                    }
+                }
+                dataOutputStream.writeBoolean(lastValue);
+                dataOutputStream.writeShort(count);
+                return byteArrayOutputStream.toByteArray();
+            }
+
+            @Override
+            public boolean[][] decompress(byte[] bytes, int tilesX, int tilesY) throws IOException {
+                final boolean[][] tiles = new boolean[tilesX][tilesY];
+                final ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(bytes);
+                final DataInputStream dataInputStream = new DataInputStream(byteArrayInputStream);
+
+                int x = 0, y = 0;
+                while (dataInputStream.available() > 0) {
+                    boolean value = dataInputStream.readBoolean();
+                    int count = dataInputStream.readShort();
+                    for (int i = 0; i < count; i++) {
+                        tiles[x][y] = value;
+                        x++;
+                        if (x >= tilesX) {
+                            x = 0;
+                            y++;
+                        }
+                    }
+                }
+                return tiles;
+            }
+        };
+
+        public abstract byte[] compress(boolean[][] tiles, int tilesX, int tilesY) throws IOException;
+
+        public abstract boolean[][] decompress(byte[] bytes, int tilesX, int tilesY) throws IOException;
 
     }
 
