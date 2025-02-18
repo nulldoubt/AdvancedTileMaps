@@ -103,10 +103,11 @@ public class TileLayer {
         );
         tileLayer.setOverlayScale(root.getFloat("overlayScale"));
         tileLayer.setRenderStrategy(IntegratedStrategy.valueOf(root.getString("renderStrategy")));
+        tileLayer.setCompressionStrategy(CompressionStrategy.fromIndex(root.getByte("compressionStrategy")));
 
         boolean[][] tiles;
         try {
-            tiles = defaultCompressionStrategy.decompress(root.get("tiles").asByteArray(), tileLayer.tilesX, tileLayer.tilesY);
+            tiles = tileLayer.compressionStrategy.decompress(root.get("tiles").asByteArray(), tileLayer.tilesX, tileLayer.tilesY);
         } catch (IOException e) {
             throw new GdxRuntimeException("Unable to decompress tile layer", e);
         }
@@ -132,7 +133,8 @@ public class TileLayer {
                 .set("overlayScale", tileLayer.overlayScale)
                 .set("unitScale", tileLayer.unitScale)
                 .set("renderStrategy", IntegratedStrategy.nameOf(tileLayer.renderStrategy))
-                .set("tiles", defaultCompressionStrategy.compress(tileLayer.tiles, tileLayer.tilesX, tileLayer.tilesY))
+                .set("compressionStrategy", tileLayer.compressionStrategy.index)
+                .set("tiles", tileLayer.compressionStrategy.compress(tileLayer.tiles, tileLayer.tilesX, tileLayer.tilesY))
                 .pop()
                 .flush();
             return true;
@@ -165,6 +167,7 @@ public class TileLayer {
     private final byte[][] indices;
 
     private RenderStrategy renderStrategy;
+    private CompressionStrategy compressionStrategy;
     private int tilesRendered;
     private int quadsRendered;
 
@@ -185,6 +188,7 @@ public class TileLayer {
         viewBounds = new Rectangle();
 
         renderStrategy = defaultRenderStrategy;
+        compressionStrategy = defaultCompressionStrategy;
         fill(fill);
     }
 
@@ -290,6 +294,14 @@ public class TileLayer {
 
     public void setRenderStrategy(RenderStrategy renderStrategy) {
         this.renderStrategy = renderStrategy;
+    }
+
+    public CompressionStrategy getCompressionStrategy() {
+        return compressionStrategy;
+    }
+
+    public void setCompressionStrategy(CompressionStrategy compressionStrategy) {
+        this.compressionStrategy = compressionStrategy;
     }
 
     public void fill(boolean state) {
@@ -485,7 +497,7 @@ public class TileLayer {
 
     public enum CompressionStrategy {
 
-        BIT_COMPRESSED() {
+        BIT_COMPRESSED((byte) 0) {
             @Override
             public byte[] compress(boolean[][] tiles, int tilesX, int tilesY) {
                 int totalBits = tilesX * tilesY;
@@ -517,7 +529,7 @@ public class TileLayer {
                 return tiles;
             }
         },
-        SPARSE_COMPRESSED() {
+        SPARSE_COMPRESSED((byte) 1) {
             @Override
             public byte[] compress(boolean[][] tiles, int tilesX, int tilesY) throws IOException {
                 final ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
@@ -547,7 +559,7 @@ public class TileLayer {
                 return tiles;
             }
         },
-        RUN_LENGTH_COMPRESSED() {
+        RUN_LENGTH_COMPRESSED((byte) 2) {
             @Override
             public byte[] compress(boolean[][] tiles, int tilesX, int tilesY) throws IOException {
                 final ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
@@ -594,9 +606,26 @@ public class TileLayer {
             }
         };
 
+        protected final byte index;
+
+        CompressionStrategy(byte index) {
+            this.index = index;
+        }
+
         public abstract byte[] compress(boolean[][] tiles, int tilesX, int tilesY) throws IOException;
 
         public abstract boolean[][] decompress(byte[] bytes, int tilesX, int tilesY) throws IOException;
+
+        public static CompressionStrategy fromIndex(byte b) {
+            if (b == 0)
+                return CompressionStrategy.BIT_COMPRESSED;
+            else if (b == 1)
+                return CompressionStrategy.SPARSE_COMPRESSED;
+            else if (b == 2)
+                return CompressionStrategy.RUN_LENGTH_COMPRESSED;
+            else
+                throw new IllegalArgumentException("Unknown compression strategy: " + b);
+        }
 
     }
 
