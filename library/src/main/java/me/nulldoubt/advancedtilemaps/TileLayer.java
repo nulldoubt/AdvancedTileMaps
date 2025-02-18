@@ -50,7 +50,7 @@ public class TileLayer {
             new GridPoint2(0, 1), new GridPoint2(1, 1)
         };
 
-        defaultCompressionStrategy = CompressionStrategy.BIT_COMPRESSED;
+        defaultCompressionStrategy = CompressionStrategy.RUN_LENGTH_COMPRESSED;
         defaultRenderStrategy = RenderStrategy.VIEW_TILES_VIEW_QUADS;
         insetToleranceX = 0.01f;
         insetToleranceY = 0.01f;
