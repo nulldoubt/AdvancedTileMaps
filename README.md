@@ -179,6 +179,16 @@ TileLayer.read(fileHandle); // read from a file handle.
 TileLayer.read(outputStream); // read from an input stream.
 ```
 
+#### Compression Statistics
+
+A simple benchmark showed that:
+
+| Tiles       |    Size    |
+|:------------|:----------:|
+| 4.096       |   ~0.5KB   |
+| 1.000.000   |   ~120KB   |
+| 100.000.000 |   ~12MB    |
+
 ## Library vs. Example
 
 This repository contains both the **library** and an **example project**:
