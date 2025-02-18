@@ -333,6 +333,7 @@ public class AdvancedTilemapsExample extends ApplicationAdapter {
             renderInterface(batch);
         batch.end(); // end the batch.
 
+        worldViewport.apply(); // Reapply the world viewport (after interface is rendered).
         shapes.setProjectionMatrix(worldCamera.combined);
         shapes.begin(ShapeRenderer.ShapeType.Line);
         if (grid)
