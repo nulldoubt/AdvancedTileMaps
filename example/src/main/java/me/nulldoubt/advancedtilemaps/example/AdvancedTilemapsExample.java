@@ -198,8 +198,10 @@ public class AdvancedTilemapsExample extends ApplicationAdapter {
         interfaceViewport = new ScreenViewport();
         interfaceCamera = (OrthographicCamera) interfaceViewport.getCamera();
 
+        final int axisLength = 64;
+
         // initializing our dirt tile layer.
-        dirtLayer = new TileLayer(64, 64, 16f, 16f, 1f / 16f, true);
+        dirtLayer = new TileLayer(axisLength, axisLength, 16f, 16f, 1f / 16f, true);
         dirtLayer.setTileSet(new TextureRegion(dirt));
         dirtLayer.setOverlay(dirtOverlay, shader);
 
@@ -208,7 +210,7 @@ public class AdvancedTilemapsExample extends ApplicationAdapter {
         if (grassLayerFile.exists())
             grassLayer = TileLayer.read(grassLayerFile);
         else
-            grassLayer = new TileLayer(64, 64, 16f, 16f, 1f / 16f, false);
+            grassLayer = new TileLayer(axisLength, axisLength, 16f, 16f, 1f / 16f, false);
         grassLayer.setTileSet(new TextureRegion(grass));
         grassLayer.setOverlay(grassOverlay, shader);
 
