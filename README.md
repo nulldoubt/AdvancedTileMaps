@@ -41,7 +41,7 @@ tiles.
 
 ### What does "auto-tileable" mean?
 
-Each `TileLayer` uses a bitmasking system to **automatically determine** the correct tile variant based on its **four
+Each `TileLayer` uses a bitmask system to **automatically determine** the correct tile variant based on its **four
 cornering neighbors**. This means you **don’t have to manually place tiles**—the system will handle it for you!
 
 **Here's a little showcase of the example included (press to play the video):**
@@ -92,7 +92,7 @@ new TileLayer(
 Once you have an instance, set the tile texture:
 
 ```java
-tileLayer.setTileSet(textureRegion);
+tileLayer.setTileSet(TextureRegion);
 ```
 
 ### Adding an Overlay (Optional)
@@ -100,7 +100,7 @@ tileLayer.setTileSet(textureRegion);
 You can integrate an **overlay texture** and an **overlay shader** using:
 
 ```java
-tileLayer.setOverlay(overlayTexture, overlayShader);
+tileLayer.setOverlay(Texture, ShaderProgram);
 ```
 
 ### Rendering the Tile Layer
@@ -108,8 +108,8 @@ tileLayer.setOverlay(overlayTexture, overlayShader);
 In your render pipeline:
 
 ```java
-tileLayer.setView(camera); // Set view bounds to the camera
-tileLayer.render(batch);   // Render using a batch
+tileLayer.setView(OrthographicCamera); // Set view bounds to the camera
+tileLayer.render(Batch);   // Render using a batch
 ```
 
 *You may also use the overloaded method `setView(x, y, w, h)` if you don't have a camera.*
@@ -119,7 +119,7 @@ tileLayer.render(batch);   // Render using a batch
 If you experience **texture bleeding**, adjust the inset tolerance:
 
 ```java
-TileLayer.setInsetTolerance(float xTolerance, float yTolerance);
+TileLayer#setInsetTolerance(float, float);
 ```
 
 This allows you to handle texture bleeding properly at runtime, without ever modifying your texture.
@@ -134,14 +134,14 @@ Suggested values:
 If your tile-set layout differs from the default, you can set a **custom auto-tile configuration**:
 
 ```java
-TileLayer.setAutoTileConfiguration(IntMap<Byte> configuration);
+TileLayer#setAutoTileConfiguration(IntMap<Byte>);
 ```
 
 *Note that this is currently a **static property**, meaning it applies to all tile layers.*
 
 ### Rendering Strategies
 
-You may experiment with different `IRenderStrategy` implementations for your tilemap, there are 4 
+You may experiment with different `IRenderStrategy` implementations for your tilemap, there are 4
 rendering strategies integrated as of now:
 
 * `RenderStrategy.ALL_TILES_ALL_QUADS` will render all tiles and all quads.
@@ -151,12 +151,12 @@ rendering strategies integrated as of now:
 
 *Invisible quads are the ones associated with bitmask 0 in the auto-tile configuration.*
 
-**You can also provide your own implementation of the `IRenderStrategy` interface.**
+**You may also provide your own implementation of the `IRenderStrategy` interface.**
 
 You may change the current tile layer rendering strategy like this:
 
 ```java
-tileLayer.setRenderStrategy(renderStrategy);
+tileLayer.setRenderStrategy(IRenderStrategy);
 ```
 
 ### Serialization
@@ -168,26 +168,50 @@ using the `UBJson` file format.
 You may *write* your tile layer to a file handle or an output stream like this:
 
 ```java
-TileLayer.write(tileLayer, fileHandle); // write to a file handle.
-TileLayer.write(tileLayer, outputStream); // write to an output stream.
+TileLayer#write(TileLayer, FileHandle); // write to a file handle.
+TileLayer#write(TileLayer, OutputStream); // write to an output stream.
 ```
 
 And you may *read* your tile layer from a file handle or an input stream like this:
 
 ```java
-TileLayer.read(fileHandle); // read from a file handle.
-TileLayer.read(outputStream); // read from an input stream.
+TileLayer#read(FileHandle); // read from a file handle.
+TileLayer#read(OutputStream); // read from an input stream.
 ```
 
-#### Compression Statistics
+### Compression Strategies
 
-A simple benchmark showed that:
+You may also choose your desired compression strategy when serializing
+a tile layer. Either set the default compression strategy using
 
-| Tiles       |    Size    |
-|:------------|:----------:|
-| 4.096       |   ~0.5KB   |
-| 1.000.000   |   ~120KB   |
-| 100.000.000 |   ~12MB    |
+```java
+TileLayer#setDefaultCompressionStrategy(ICompressionStrategy);
+```
+
+or set it per tile layer, like so:
+
+```java
+tileLayer.setCompressionStrategy(ICompressionStrategy);
+```
+
+Either way, you have access to 3 implemented compression strategies in
+this library:
+
+| Strategy                   |                         Suggestion                          | Bits per tile <br/>(Worst case) |
+|:---------------------------|:-----------------------------------------------------------:|:-------------------------------:|
+| **BIT_COMPRESSION**        | Good for large layers with <br/>many randomly placed tiles. |              1 Bit              |
+| **SPARSE_COMPRESSION**     |    Good for small layers with <br/>little tiles placed.     |             32 Bit              |
+| **RUN_LENGTH_COMPRESSION** |  Good for layers of all sizes <br/>with row-placed tiles.   |             ~17 Bit             |
+
+These implementations can be found in the `TileLayer.CompressionStrategy` enum.
+
+This library chooses the `RUN_LENGTH_COMPRESSION` strategy as the default compression strategy.
+
+**You may also provide your own implementation of the `ICompressionStrategy` interface.**
+
+_Note: If you serialize using your own compression, you'll have to set the custom compression strategy supplier before
+reading your map, you may do that using
+the `TileLayer#setCustomCompressionStrategySupplier(Supplier<ICompressionStrategy>);` method._
 
 ## Library vs. Example
 
