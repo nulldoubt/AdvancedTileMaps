@@ -78,12 +78,12 @@ You can create a new `TileLayer` instance using:
 
 ```java
 new TileLayer(
-        int tilesX,         // World width in tiles
-        int tilesY,         // World height in tiles
-        float tileWidth,    // Tile width
-        float tileHeight,   // Tile height
-        float unitScale,    // Unit scale of the world
-        boolean fill        // Should the layer start filled?
+	int tilesX,         // World width in tiles
+	int tilesY,         // World height in tiles
+	float tileWidth,    // Tile width
+	float tileHeight,   // Tile height
+	float unitScale,    // Unit scale of the world
+	boolean fill        // Should the layer start filled?
 );
 ```
 
@@ -246,14 +246,14 @@ the `TileLayer#setCustomCompressionStrategySupplier(Supplier<ICompressionStrateg
 This repository contains both the **library** and an **example project**:
 
 - **Library (`:library` Gradle submodule)**
-    - Contains everything related to the `TileLayer` class.
-    - Located in the [`library`](library) folder.
-    - This is the core functionality meant for integration into your own projects.
+	- Contains everything related to the `TileLayer` class.
+	- Located in the [`library`](library) folder.
+	- This is the core functionality meant for integration into your own projects.
 
 - **Example (`:example` Gradle submodule)**
-    - A demonstration of how to use `TileLayer`.
-    - Located in the [`example`](example) folder.
-    - Provides a working implementation showcasing auto-tiling, overlays, and viewport management.
+	- A demonstration of how to use `TileLayer`.
+	- Located in the [`example`](example) folder.
+	- Provides a working implementation showcasing auto-tiling, overlays, and viewport management.
 
 ## Running the Example
 

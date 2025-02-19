@@ -16,651 +16,651 @@ import java.util.function.Supplier;
 
 public class TileLayer {
 
-    private static final IntMap<Byte> configuration;
-    private static final GridPoint2[] neighbors;
-
-    private static Supplier<ICompressionStrategy> customCompressionStrategySupplier;
-    private static ICompressionStrategy defaultCompressionStrategy;
-    private static IRenderStrategy defaultRenderStrategy;
-    private static float insetToleranceX;
-    private static float insetToleranceY;
-    private static byte zeroIndex;
-
-    static {
-        configuration = new IntMap<>(16);
-        configuration.put(0b1111, (byte) 6);
-        configuration.put(0b0001, (byte) 13);
-        configuration.put(0b0010, (byte) 0);
-        configuration.put(0b0100, (byte) 8);
-        configuration.put(0b1000, (byte) 15);
-        configuration.put(0b0101, (byte) 1);
-        configuration.put(0b1010, (byte) 11);
-        configuration.put(0b0011, (byte) 3);
-        configuration.put(0b1100, (byte) 9);
-        configuration.put(0b0111, (byte) 5);
-        configuration.put(0b1011, (byte) 2);
-        configuration.put(0b1101, (byte) 10);
-        configuration.put(0b1110, (byte) 7);
-        configuration.put(0b0110, (byte) 14);
-        configuration.put(0b1001, (byte) 4);
-        configuration.put(0b0000, zeroIndex = (byte) 12);
-
-        neighbors = new GridPoint2[]{
-            new GridPoint2(0, 0), new GridPoint2(1, 0),
-            new GridPoint2(0, 1), new GridPoint2(1, 1)
-        };
-
-        defaultCompressionStrategy = CompressionStrategy.RUN_LENGTH_COMPRESSED;
-        defaultRenderStrategy = RenderStrategy.VIEW_TILES_VIEW_QUADS;
-        insetToleranceX = 0.01f;
-        insetToleranceY = 0.01f;
-    }
-
-    public static void setAutoTileConfiguration(IntMap<Byte> configuration) {
-        TileLayer.configuration.clear(16);
-        TileLayer.configuration.putAll(configuration);
-        zeroIndex = TileLayer.configuration.get(0b0000);
-    }
-
-    /* Re-set your tileSet after using this! */
-    public static void setInsetTolerance(float insetToleranceX, float insetToleranceY) {
-        TileLayer.insetToleranceX = insetToleranceX;
-        TileLayer.insetToleranceY = insetToleranceY;
-    }
-
-    public static IRenderStrategy getDefaultRenderStrategy() {
-        return defaultRenderStrategy;
-    }
-
-    public static void setDefaultRenderStrategy(IRenderStrategy defaultRenderStrategy) {
-        TileLayer.defaultRenderStrategy = defaultRenderStrategy;
-    }
-
-    public static ICompressionStrategy getDefaultCompressionStrategy() {
-        return defaultCompressionStrategy;
-    }
-
-    public static void setDefaultCompressionStrategy(ICompressionStrategy defaultCompressionStrategy) {
-        TileLayer.defaultCompressionStrategy = defaultCompressionStrategy;
-    }
-
-    public static void setCustomCompressionStrategySupplier(Supplier<ICompressionStrategy> customCompressionStrategySupplier) {
-        TileLayer.customCompressionStrategySupplier = customCompressionStrategySupplier;
-    }
-
-    /* Serialization methods */
-    public static TileLayer read(FileHandle fileHandle) {
-        return read(fileHandle.read());
-    }
-
-    public static TileLayer read(InputStream inputStream) {
-        final UBJsonReader reader = new UBJsonReader();
-        reader.oldFormat = false;
-
-        final JsonValue root = reader.parse(inputStream);
-        final TileLayer tileLayer = new TileLayer(
-            root.getInt("tilesX"),
-            root.getInt("tilesY"),
-            root.getInt("tileWidth"),
-            root.getInt("tileHeight"),
-            root.getFloat("unitScale"),
-            false
-        );
-        tileLayer.setOverlayScale(root.getFloat("overlayScale"));
-
-        if (root.has("renderStrategy"))
-            tileLayer.setRenderStrategy(RenderStrategy.fromIndex(root.getByte("renderStrategy")));
-        if (root.has("compressionStrategy"))
-            tileLayer.setCompressionStrategy(CompressionStrategy.fromIndex(root.getByte("compressionStrategy")));
-        else if (customCompressionStrategySupplier == null)
-            throw new IllegalStateException("Custom compression strategy supplier not set");
-        else
-            tileLayer.setCompressionStrategy(customCompressionStrategySupplier.get());
-
-        boolean[][] tiles;
-        try {
-            tiles = tileLayer.compressionStrategy.decompress(root.get("tiles").asByteArray(), tileLayer.tilesX, tileLayer.tilesY);
-        } catch (IOException e) {
-            throw new GdxRuntimeException("Unable to decompress tile layer", e);
-        }
-        for (int x = 0; x < tileLayer.tilesX; x++)
-            for (int y = 0; y < tileLayer.tilesY; y++)
-                tileLayer.tileAt(x, y, tiles[x][y]);
-
-        return tileLayer;
-    }
-
-    public static boolean write(TileLayer tileLayer, FileHandle fileHandle) {
-        return write(tileLayer, fileHandle.write(false));
-    }
-
-    public static boolean write(TileLayer tileLayer, OutputStream outputStream) {
-        try (final UBJsonWriter writer = new UBJsonWriter(outputStream)) {
-            writer
-                .object()
-                .set("tilesX", tileLayer.tilesX)
-                .set("tilesY", tileLayer.tilesY)
-                .set("tileWidth", tileLayer.tileWidth)
-                .set("tileHeight", tileLayer.tileHeight)
-                .set("overlayScale", tileLayer.overlayScale)
-                .set("unitScale", tileLayer.unitScale);
-
-            if (tileLayer.renderStrategy instanceof RenderStrategy)
-                writer.set("renderStrategy", ((RenderStrategy) tileLayer.renderStrategy).index);
-
-            if (tileLayer.compressionStrategy instanceof CompressionStrategy)
-                writer.set("compressionStrategy", ((CompressionStrategy) tileLayer.compressionStrategy).index);
-
-            writer.set("tiles", tileLayer.compressionStrategy.compress(tileLayer.tiles, tileLayer.tilesX, tileLayer.tilesY))
-                .pop()
-                .flush();
-            return true;
-        } catch (IOException e) {
-            throw new GdxRuntimeException("Unable to compress tile layer", e);
-        }
-    }
-
-    private final TextureRegion[] tileSet;
-    private final Rectangle viewBounds;
-    private Texture texture;
-
-    private Texture overlayTexture;
-    private ShaderProgram overlayShaderProgram;
-    private boolean overlayed;
-
-    private final int tilesX;
-    private final int tilesY;
-
-    private final float tileWidth;
-    private final float tileHeight;
-
-    private final float offsetX;
-    private final float offsetY;
-
-    private float overlayScale;
-    private float unitScale;
-
-    private final boolean[][] tiles;
-    private final byte[][] indices;
-
-    private IRenderStrategy renderStrategy;
-    private ICompressionStrategy compressionStrategy;
-    private int tilesRendered;
-    private int quadsRendered;
-
-    public TileLayer(int tilesX, int tilesY, float tileWidth, float tileHeight, float unitScale, boolean fill) {
-        this.tilesX = tilesX;
-        this.tilesY = tilesY;
-        this.tileWidth = tileWidth;
-        this.tileHeight = tileHeight;
-        this.unitScale = unitScale;
-
-        offsetX = tileWidth / 2f;
-        offsetY = tileHeight / 2f;
-
-        tiles = new boolean[tilesX][tilesY];
-        indices = new byte[tilesX][tilesY];
-
-        tileSet = new TextureRegion[16];
-        viewBounds = new Rectangle();
-
-        renderStrategy = defaultRenderStrategy;
-        compressionStrategy = defaultCompressionStrategy;
-        fill(fill);
-    }
-
-    public int getTilesX() {
-        return tilesX;
-    }
-
-    public int getTilesY() {
-        return tilesY;
-    }
-
-    public float getTileWidth() {
-        return tileWidth;
-    }
-
-    public float getTileHeight() {
-        return tileHeight;
-    }
-
-    public float getOffsetX() {
-        return offsetX;
-    }
-
-    public float getOffsetY() {
-        return offsetY;
-    }
-
-    public float getUnitScale() {
-        return unitScale;
-    }
-
-    public void setUnitScale(float unitScale) {
-        this.unitScale = unitScale;
-    }
-
-    public float getOverlayScale() {
-        return overlayScale;
-    }
-
-    public void setOverlayScale(float overlayScale) {
-        this.overlayScale = overlayScale;
-    }
-
-    public boolean hasOverlay() {
-        return overlayed;
-    }
-
-    public Texture getOverlayTexture() {
-        return overlayTexture;
-    }
-
-    public ShaderProgram getOverlayShaderProgram() {
-        return overlayShaderProgram;
-    }
-
-    public void setOverlay(Texture overlayTexture, ShaderProgram overlayShaderProgram) {
-        this.overlayTexture = overlayTexture;
-        this.overlayShaderProgram = overlayShaderProgram;
-        overlayed = (overlayTexture != null && overlayShaderProgram != null);
-        if (overlayed)
-            overlayScale = 1f / overlayTexture.getWidth();
-    }
-
-    public boolean hasTileSet() {
-        return texture != null;
-    }
-
-    public Texture getTileSetTexture() {
-        return texture;
-    }
-
-    public void setTileSet(final TextureRegion textureRegion) {
-        texture = textureRegion.getTexture();
-        final float tileSetU = textureRegion.getU();
-        final float tileSetV = textureRegion.getV();
-        final float width = tileWidth / texture.getWidth();
-        final float height = tileHeight / texture.getHeight();
-        final float insetX = insetToleranceX / texture.getWidth();
-        final float insetY = insetToleranceY / texture.getHeight();
-        for (int i = 0; i < 4; i++)
-            for (int j = 0; j < 4; j++) {
-                final float u = tileSetU + i * width + insetX;
-                final float v = tileSetV + j * height + insetY;
-                tileSet[i + j * 4] = new TextureRegion(texture, u, v, u + width - 2 * insetX, v + height - 2 * insetY);
-            }
-    }
-
-    public Rectangle getViewBounds() {
-        return viewBounds;
-    }
-
-    public int getTilesRendered() {
-        return tilesRendered;
-    }
-
-    public int getQuadsRendered() {
-        return quadsRendered;
-    }
-
-    public IRenderStrategy getRenderStrategy() {
-        return renderStrategy;
-    }
-
-    public void setRenderStrategy(IRenderStrategy renderStrategy) {
-        this.renderStrategy = renderStrategy;
-    }
-
-    public ICompressionStrategy getCompressionStrategy() {
-        return compressionStrategy;
-    }
-
-    public void setCompressionStrategy(ICompressionStrategy compressionStrategy) {
-        this.compressionStrategy = compressionStrategy;
-    }
-
-    public void fill(boolean state) {
-        for (final boolean[] row : tiles)
-            Arrays.fill(row, state);
-        final byte tile = configuration.get(state ? 0b1111 : 0b0000);
-        for (final byte[] row : indices)
-            Arrays.fill(row, tile);
-    }
-
-    public boolean isOutOfBounds(final int x, final int y) {
-        return (x < 0 || y < 0 || x >= tilesX || y >= tilesY);
-    }
-
-    public boolean tileAt(final int x, final int y) {
-        if (isOutOfBounds(x, y))
-            return false;
-        return tiles[x][y];
-    }
-
-    public void tileAt(final int x, final int y, final boolean state) {
-        if (isOutOfBounds(x, y))
-            return;
-        tiles[x][y] = state;
-        for (final GridPoint2 neighbor : neighbors) {
-            final int nX = x + neighbor.x;
-            final int nY = y + neighbor.y;
-            if (isOutOfBounds(nX, nY))
-                continue;
-
-            int bitmask = 0;
-            bitmask |= tileAt(nX - neighbors[1].x, nY - neighbors[1].y) ? (1 << 3) : 0;
-            bitmask |= tileAt(nX - neighbors[0].x, nY - neighbors[0].y) ? (1 << 2) : 0;
-            bitmask |= tileAt(nX - neighbors[3].x, nY - neighbors[3].y) ? (1 << 1) : 0;
-            bitmask |= tileAt(nX - neighbors[2].x, nY - neighbors[2].y) ? (1) : 0;
-            indices[nX][nY] = configuration.get(bitmask);
-        }
-    }
-
-    /* May be called before rendering! */
-    public void setView(OrthographicCamera camera) {
-        float width = camera.viewportWidth * camera.zoom;
-        float height = camera.viewportHeight * camera.zoom;
-        float w = width * Math.abs(camera.up.y) + height * Math.abs(camera.up.x);
-        float h = height * Math.abs(camera.up.y) + width * Math.abs(camera.up.x);
-        viewBounds.set(camera.position.x - w / 2, camera.position.y - h / 2, w, h);
-    }
-
-    /* May be called before rendering! */
-    public void setView(float x, float y, float width, float height) {
-        viewBounds.set(x, y, width, height);
-    }
-
-    public void render(final Batch batch) {
-        if (texture == null)
-            return;
-
-        if (overlayed) {
-            overlayTexture.bind(1);
-            texture.bind(0);
-            overlayShaderProgram.bind();
-            overlayShaderProgram.setUniformi("u_overlay", 1);
-            overlayShaderProgram.setUniformi("u_texture", 0);
-            overlayShaderProgram.setUniformf("u_scale", overlayScale / unitScale);
-            batch.setShader(overlayShaderProgram);
-        }
-
-        renderStrategy.render(this, batch);
-
-        if (overlayed)
-            batch.setShader(null);
-    }
-
-    public enum RenderStrategy implements IRenderStrategy {
-
-        ALL_TILES_ALL_QUADS((byte) 0) {
-            @Override
-            public void render(TileLayer tileLayer, Batch batch) {
-                final float tileWidth = tileLayer.tileWidth * tileLayer.unitScale;
-                final float tileHeight = tileLayer.tileHeight * tileLayer.unitScale;
-                tileLayer.tilesRendered = 0;
-                tileLayer.quadsRendered = 0;
-                for (int x = 0; x < tileLayer.tilesX; x++) {
-                    for (int y = 0; y < tileLayer.tilesY; y++) {
-                        if (tileLayer.tiles[x][y])
-                            tileLayer.tilesRendered++;
-                        tileLayer.quadsRendered++;
-                        batch.draw(tileLayer.tileSet[tileLayer.indices[x][y]],
-                            (tileLayer.offsetX + x * tileLayer.tileWidth) * tileLayer.unitScale,
-                            (tileLayer.offsetY + y * tileLayer.tileHeight) * tileLayer.unitScale,
-                            tileWidth, tileHeight
-                        );
-                    }
-                }
-            }
-        },
-
-        ALL_TILES_VIEW_QUADS((byte) 1) {
-            @Override
-            public void render(TileLayer tileLayer, Batch batch) {
-                final float tileWidth = tileLayer.tileWidth * tileLayer.unitScale;
-                final float tileHeight = tileLayer.tileHeight * tileLayer.unitScale;
-                tileLayer.tilesRendered = 0;
-                tileLayer.quadsRendered = 0;
-                byte index;
-                for (int x = 0; x < tileLayer.tilesX; x++) {
-                    for (int y = 0; y < tileLayer.tilesY; y++) {
-                        if (tileLayer.tiles[x][y])
-                            tileLayer.tilesRendered++;
-                        index = tileLayer.indices[x][y];
-                        if (index == zeroIndex)
-                            continue;
-                        tileLayer.quadsRendered++;
-                        batch.draw(tileLayer.tileSet[index],
-                            (tileLayer.offsetX + x * tileLayer.tileWidth) * tileLayer.unitScale,
-                            (tileLayer.offsetY + y * tileLayer.tileHeight) * tileLayer.unitScale,
-                            tileWidth, tileHeight
-                        );
-                    }
-                }
-            }
-        },
-
-        VIEW_TILES_ALL_QUADS((byte) 2) {
-            @Override
-            public void render(TileLayer tileLayer, Batch batch) {
-                final float tileWidth = tileLayer.tileWidth * tileLayer.unitScale;
-                final float tileHeight = tileLayer.tileHeight * tileLayer.unitScale;
-                int col1 = Math.max(0, (int) ((tileLayer.viewBounds.x - tileLayer.offsetX) / (tileWidth)));
-                int col2 = Math.min(tileLayer.tilesX, (int) ((tileLayer.viewBounds.x + tileLayer.viewBounds.width) / (tileWidth)) + 1);
-                int row1 = Math.max(0, (int) ((tileLayer.viewBounds.y - tileLayer.offsetY) / (tileHeight)));
-                int row2 = Math.min(tileLayer.tilesY, (int) ((tileLayer.viewBounds.y + tileLayer.viewBounds.height) / (tileHeight)) + 1);
-                tileLayer.tilesRendered = 0;
-                tileLayer.quadsRendered = 0;
-                for (int x = col1; x < col2; x++) {
-                    for (int y = row1; y < row2; y++) {
-                        if (tileLayer.tiles[x][y])
-                            tileLayer.tilesRendered++;
-                        tileLayer.quadsRendered++;
-                        batch.draw(tileLayer.tileSet[tileLayer.indices[x][y]],
-                            (tileLayer.offsetX + x * tileLayer.tileWidth) * tileLayer.unitScale,
-                            (tileLayer.offsetY + y * tileLayer.tileHeight) * tileLayer.unitScale,
-                            tileWidth, tileHeight
-                        );
-                    }
-                }
-            }
-        },
-
-        VIEW_TILES_VIEW_QUADS((byte) 3) {
-            @Override
-            public void render(TileLayer tileLayer, Batch batch) {
-                final float tileWidth = tileLayer.tileWidth * tileLayer.unitScale;
-                final float tileHeight = tileLayer.tileHeight * tileLayer.unitScale;
-                int col1 = Math.max(0, (int) ((tileLayer.viewBounds.x - tileLayer.offsetX) / (tileWidth)));
-                int col2 = Math.min(tileLayer.tilesX, (int) ((tileLayer.viewBounds.x + tileLayer.viewBounds.width) / (tileWidth)) + 1);
-                int row1 = Math.max(0, (int) ((tileLayer.viewBounds.y - tileLayer.offsetY) / (tileHeight)));
-                int row2 = Math.min(tileLayer.tilesY, (int) ((tileLayer.viewBounds.y + tileLayer.viewBounds.height) / (tileHeight)) + 1);
-                tileLayer.tilesRendered = 0;
-                tileLayer.quadsRendered = 0;
-                byte index;
-                for (int x = col1; x < col2; x++) {
-                    for (int y = row1; y < row2; y++) {
-                        if (tileLayer.tiles[x][y])
-                            tileLayer.tilesRendered++;
-                        index = tileLayer.indices[x][y];
-                        if (index == zeroIndex)
-                            continue;
-                        tileLayer.quadsRendered++;
-                        batch.draw(tileLayer.tileSet[index],
-                            (tileLayer.offsetX + x * tileLayer.tileWidth) * tileLayer.unitScale,
-                            (tileLayer.offsetY + y * tileLayer.tileHeight) * tileLayer.unitScale,
-                            tileWidth, tileHeight
-                        );
-                    }
-                }
-            }
-        };
-
-        private final byte index;
-
-        RenderStrategy(byte index) {
-            this.index = index;
-        }
-
-        public static RenderStrategy fromIndex(byte b) {
-            if (b == 0)
-                return RenderStrategy.ALL_TILES_ALL_QUADS;
-            else if (b == 1)
-                return RenderStrategy.ALL_TILES_VIEW_QUADS;
-            else if (b == 2)
-                return RenderStrategy.VIEW_TILES_ALL_QUADS;
-            else if (b == 3)
-                return RenderStrategy.VIEW_TILES_VIEW_QUADS;
-            else
-                throw new IllegalArgumentException("Unknown render strategy: " + b);
-        }
-
-    }
-
-    public interface IRenderStrategy {
-
-        void render(TileLayer tileLayer, Batch batch);
-
-    }
-
-    public enum CompressionStrategy implements ICompressionStrategy {
-
-        BIT_COMPRESSED((byte) 0) {
-            @Override
-            public byte[] compress(boolean[][] tiles, int tilesX, int tilesY) {
-                int totalBits = tilesX * tilesY;
-                int totalBytes = (totalBits + 7) / 8;
-                byte[] bytes = new byte[totalBytes];
-
-                int bitIndex = 0;
-                for (int y = 0; y < tilesY; y++) {
-                    for (boolean[] tile : tiles) {
-                        if (tile[y])
-                            bytes[bitIndex / 8] |= (byte) (1 << (bitIndex % 8));
-                        bitIndex++;
-                    }
-                }
-                return bytes;
-            }
-
-            @Override
-            public boolean[][] decompress(byte[] bytes, int tilesX, int tilesY) {
-                boolean[][] tiles = new boolean[tilesX][tilesY];
-
-                int bitIndex = 0;
-                for (int y = 0; y < tilesY; y++) {
-                    for (int x = 0; x < tilesX; x++) {
-                        tiles[x][y] = (bytes[bitIndex / 8] & (1 << (bitIndex % 8))) != 0;
-                        bitIndex++;
-                    }
-                }
-                return tiles;
-            }
-        },
-        SPARSE_COMPRESSED((byte) 1) {
-            @Override
-            public byte[] compress(boolean[][] tiles, int tilesX, int tilesY) throws IOException {
-                final ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-                final DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
-                for (int x = 0; x < tilesX; x++)
-                    for (int y = 0; y < tilesY; y++) {
-                        if (tiles[x][y]) {
-                            dataOutputStream.writeShort(x);
-                            dataOutputStream.writeShort(y);
-                        }
-                    }
-                final byte[] buffer = byteArrayOutputStream.toByteArray();
-                dataOutputStream.close();
-                return buffer;
-            }
-
-            @Override
-            public boolean[][] decompress(byte[] bytes, int tilesX, int tilesY) throws IOException {
-                final boolean[][] tiles = new boolean[tilesX][tilesY];
-                final ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(bytes);
-                final DataInputStream dataInputStream = new DataInputStream(byteArrayInputStream);
-                while (dataInputStream.available() > 0) {
-                    int x = dataInputStream.readShort();
-                    int y = dataInputStream.readShort();
-                    tiles[x][y] = true;
-                }
-                return tiles;
-            }
-        },
-        RUN_LENGTH_COMPRESSED((byte) 2) {
-            @Override
-            public byte[] compress(boolean[][] tiles, int tilesX, int tilesY) throws IOException {
-                final ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-                final DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
-                boolean lastValue = tiles[0][0];
-                int count = 0;
-                for (int y = 0; y < tilesY; y++) {
-                    for (int x = 0; x < tilesX; x++) {
-                        if (tiles[x][y] == lastValue) {
-                            count++;
-                        } else {
-                            dataOutputStream.writeBoolean(lastValue);
-                            dataOutputStream.writeShort(count);
-                            lastValue = tiles[x][y];
-                            count = 1;
-                        }
-                    }
-                }
-                dataOutputStream.writeBoolean(lastValue);
-                dataOutputStream.writeShort(count);
-                return byteArrayOutputStream.toByteArray();
-            }
-
-            @Override
-            public boolean[][] decompress(byte[] bytes, int tilesX, int tilesY) throws IOException {
-                final boolean[][] tiles = new boolean[tilesX][tilesY];
-                final ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(bytes);
-                final DataInputStream dataInputStream = new DataInputStream(byteArrayInputStream);
-
-                int x = 0, y = 0;
-                while (dataInputStream.available() > 0) {
-                    boolean value = dataInputStream.readBoolean();
-                    int count = dataInputStream.readShort();
-                    for (int i = 0; i < count; i++) {
-                        tiles[x][y] = value;
-                        x++;
-                        if (x >= tilesX) {
-                            x = 0;
-                            y++;
-                        }
-                    }
-                }
-                return tiles;
-            }
-        };
-
-        private final byte index;
-
-        CompressionStrategy(byte index) {
-            this.index = index;
-        }
-
-        public static CompressionStrategy fromIndex(byte b) {
-            if (b == 0)
-                return CompressionStrategy.BIT_COMPRESSED;
-            else if (b == 1)
-                return CompressionStrategy.SPARSE_COMPRESSED;
-            else if (b == 2)
-                return CompressionStrategy.RUN_LENGTH_COMPRESSED;
-            else
-                throw new IllegalArgumentException("Unknown compression strategy: " + b);
-        }
-
-    }
-
-    public interface ICompressionStrategy {
-
-        byte[] compress(boolean[][] tiles, int tilesX, int tilesY) throws IOException;
-
-        boolean[][] decompress(byte[] bytes, int tilesX, int tilesY) throws IOException;
-
-    }
+	private static final IntMap<Byte> configuration;
+	private static final GridPoint2[] neighbors;
+
+	private static Supplier<ICompressionStrategy> customCompressionStrategySupplier;
+	private static ICompressionStrategy defaultCompressionStrategy;
+	private static IRenderStrategy defaultRenderStrategy;
+	private static float insetToleranceX;
+	private static float insetToleranceY;
+	private static byte zeroIndex;
+
+	static {
+		configuration = new IntMap<>(16);
+		configuration.put(0b1111, (byte) 6);
+		configuration.put(0b0001, (byte) 13);
+		configuration.put(0b0010, (byte) 0);
+		configuration.put(0b0100, (byte) 8);
+		configuration.put(0b1000, (byte) 15);
+		configuration.put(0b0101, (byte) 1);
+		configuration.put(0b1010, (byte) 11);
+		configuration.put(0b0011, (byte) 3);
+		configuration.put(0b1100, (byte) 9);
+		configuration.put(0b0111, (byte) 5);
+		configuration.put(0b1011, (byte) 2);
+		configuration.put(0b1101, (byte) 10);
+		configuration.put(0b1110, (byte) 7);
+		configuration.put(0b0110, (byte) 14);
+		configuration.put(0b1001, (byte) 4);
+		configuration.put(0b0000, zeroIndex = (byte) 12);
+
+		neighbors = new GridPoint2[]{
+			new GridPoint2(0, 0), new GridPoint2(1, 0),
+			new GridPoint2(0, 1), new GridPoint2(1, 1)
+		};
+
+		defaultCompressionStrategy = CompressionStrategy.RUN_LENGTH_COMPRESSED;
+		defaultRenderStrategy = RenderStrategy.VIEW_TILES_VIEW_QUADS;
+		insetToleranceX = 0.01f;
+		insetToleranceY = 0.01f;
+	}
+
+	public static void setAutoTileConfiguration(IntMap<Byte> configuration) {
+		TileLayer.configuration.clear(16);
+		TileLayer.configuration.putAll(configuration);
+		zeroIndex = TileLayer.configuration.get(0b0000);
+	}
+
+	/* Re-set your tileSet after using this! */
+	public static void setInsetTolerance(float insetToleranceX, float insetToleranceY) {
+		TileLayer.insetToleranceX = insetToleranceX;
+		TileLayer.insetToleranceY = insetToleranceY;
+	}
+
+	public static IRenderStrategy getDefaultRenderStrategy() {
+		return defaultRenderStrategy;
+	}
+
+	public static void setDefaultRenderStrategy(IRenderStrategy defaultRenderStrategy) {
+		TileLayer.defaultRenderStrategy = defaultRenderStrategy;
+	}
+
+	public static ICompressionStrategy getDefaultCompressionStrategy() {
+		return defaultCompressionStrategy;
+	}
+
+	public static void setDefaultCompressionStrategy(ICompressionStrategy defaultCompressionStrategy) {
+		TileLayer.defaultCompressionStrategy = defaultCompressionStrategy;
+	}
+
+	public static void setCustomCompressionStrategySupplier(Supplier<ICompressionStrategy> customCompressionStrategySupplier) {
+		TileLayer.customCompressionStrategySupplier = customCompressionStrategySupplier;
+	}
+
+	/* Serialization methods */
+	public static TileLayer read(FileHandle fileHandle) {
+		return read(fileHandle.read());
+	}
+
+	public static TileLayer read(InputStream inputStream) {
+		final UBJsonReader reader = new UBJsonReader();
+		reader.oldFormat = false;
+
+		final JsonValue root = reader.parse(inputStream);
+		final TileLayer tileLayer = new TileLayer(
+			root.getInt("tilesX"),
+			root.getInt("tilesY"),
+			root.getInt("tileWidth"),
+			root.getInt("tileHeight"),
+			root.getFloat("unitScale"),
+			false
+		);
+		tileLayer.setOverlayScale(root.getFloat("overlayScale"));
+
+		if (root.has("renderStrategy"))
+			tileLayer.setRenderStrategy(RenderStrategy.fromIndex(root.getByte("renderStrategy")));
+		if (root.has("compressionStrategy"))
+			tileLayer.setCompressionStrategy(CompressionStrategy.fromIndex(root.getByte("compressionStrategy")));
+		else if (customCompressionStrategySupplier == null)
+			throw new IllegalStateException("Custom compression strategy supplier not set");
+		else
+			tileLayer.setCompressionStrategy(customCompressionStrategySupplier.get());
+
+		boolean[][] tiles;
+		try {
+			tiles = tileLayer.compressionStrategy.decompress(root.get("tiles").asByteArray(), tileLayer.tilesX, tileLayer.tilesY);
+		} catch (IOException e) {
+			throw new GdxRuntimeException("Unable to decompress tile layer", e);
+		}
+		for (int x = 0; x < tileLayer.tilesX; x++)
+			for (int y = 0; y < tileLayer.tilesY; y++)
+				tileLayer.tileAt(x, y, tiles[x][y]);
+
+		return tileLayer;
+	}
+
+	public static boolean write(TileLayer tileLayer, FileHandle fileHandle) {
+		return write(tileLayer, fileHandle.write(false));
+	}
+
+	public static boolean write(TileLayer tileLayer, OutputStream outputStream) {
+		try (final UBJsonWriter writer = new UBJsonWriter(outputStream)) {
+			writer
+				.object()
+				.set("tilesX", tileLayer.tilesX)
+				.set("tilesY", tileLayer.tilesY)
+				.set("tileWidth", tileLayer.tileWidth)
+				.set("tileHeight", tileLayer.tileHeight)
+				.set("overlayScale", tileLayer.overlayScale)
+				.set("unitScale", tileLayer.unitScale);
+
+			if (tileLayer.renderStrategy instanceof RenderStrategy)
+				writer.set("renderStrategy", ((RenderStrategy) tileLayer.renderStrategy).index);
+
+			if (tileLayer.compressionStrategy instanceof CompressionStrategy)
+				writer.set("compressionStrategy", ((CompressionStrategy) tileLayer.compressionStrategy).index);
+
+			writer.set("tiles", tileLayer.compressionStrategy.compress(tileLayer.tiles, tileLayer.tilesX, tileLayer.tilesY))
+				.pop()
+				.flush();
+			return true;
+		} catch (IOException e) {
+			throw new GdxRuntimeException("Unable to compress tile layer", e);
+		}
+	}
+
+	private final TextureRegion[] tileSet;
+	private final Rectangle viewBounds;
+	private Texture texture;
+
+	private Texture overlayTexture;
+	private ShaderProgram overlayShaderProgram;
+	private boolean overlayed;
+
+	private final int tilesX;
+	private final int tilesY;
+
+	private final float tileWidth;
+	private final float tileHeight;
+
+	private final float offsetX;
+	private final float offsetY;
+
+	private float overlayScale;
+	private float unitScale;
+
+	private final boolean[][] tiles;
+	private final byte[][] indices;
+
+	private IRenderStrategy renderStrategy;
+	private ICompressionStrategy compressionStrategy;
+	private int tilesRendered;
+	private int quadsRendered;
+
+	public TileLayer(int tilesX, int tilesY, float tileWidth, float tileHeight, float unitScale, boolean fill) {
+		this.tilesX = tilesX;
+		this.tilesY = tilesY;
+		this.tileWidth = tileWidth;
+		this.tileHeight = tileHeight;
+		this.unitScale = unitScale;
+
+		offsetX = tileWidth / 2f;
+		offsetY = tileHeight / 2f;
+
+		tiles = new boolean[tilesX][tilesY];
+		indices = new byte[tilesX][tilesY];
+
+		tileSet = new TextureRegion[16];
+		viewBounds = new Rectangle();
+
+		renderStrategy = defaultRenderStrategy;
+		compressionStrategy = defaultCompressionStrategy;
+		fill(fill);
+	}
+
+	public int getTilesX() {
+		return tilesX;
+	}
+
+	public int getTilesY() {
+		return tilesY;
+	}
+
+	public float getTileWidth() {
+		return tileWidth;
+	}
+
+	public float getTileHeight() {
+		return tileHeight;
+	}
+
+	public float getOffsetX() {
+		return offsetX;
+	}
+
+	public float getOffsetY() {
+		return offsetY;
+	}
+
+	public float getUnitScale() {
+		return unitScale;
+	}
+
+	public void setUnitScale(float unitScale) {
+		this.unitScale = unitScale;
+	}
+
+	public float getOverlayScale() {
+		return overlayScale;
+	}
+
+	public void setOverlayScale(float overlayScale) {
+		this.overlayScale = overlayScale;
+	}
+
+	public boolean hasOverlay() {
+		return overlayed;
+	}
+
+	public Texture getOverlayTexture() {
+		return overlayTexture;
+	}
+
+	public ShaderProgram getOverlayShaderProgram() {
+		return overlayShaderProgram;
+	}
+
+	public void setOverlay(Texture overlayTexture, ShaderProgram overlayShaderProgram) {
+		this.overlayTexture = overlayTexture;
+		this.overlayShaderProgram = overlayShaderProgram;
+		overlayed = (overlayTexture != null && overlayShaderProgram != null);
+		if (overlayed)
+			overlayScale = 1f / overlayTexture.getWidth();
+	}
+
+	public boolean hasTileSet() {
+		return texture != null;
+	}
+
+	public Texture getTileSetTexture() {
+		return texture;
+	}
+
+	public void setTileSet(final TextureRegion textureRegion) {
+		texture = textureRegion.getTexture();
+		final float tileSetU = textureRegion.getU();
+		final float tileSetV = textureRegion.getV();
+		final float width = tileWidth / texture.getWidth();
+		final float height = tileHeight / texture.getHeight();
+		final float insetX = insetToleranceX / texture.getWidth();
+		final float insetY = insetToleranceY / texture.getHeight();
+		for (int i = 0; i < 4; i++)
+			for (int j = 0; j < 4; j++) {
+				final float u = tileSetU + i * width + insetX;
+				final float v = tileSetV + j * height + insetY;
+				tileSet[i + j * 4] = new TextureRegion(texture, u, v, u + width - 2 * insetX, v + height - 2 * insetY);
+			}
+	}
+
+	public Rectangle getViewBounds() {
+		return viewBounds;
+	}
+
+	public int getTilesRendered() {
+		return tilesRendered;
+	}
+
+	public int getQuadsRendered() {
+		return quadsRendered;
+	}
+
+	public IRenderStrategy getRenderStrategy() {
+		return renderStrategy;
+	}
+
+	public void setRenderStrategy(IRenderStrategy renderStrategy) {
+		this.renderStrategy = renderStrategy;
+	}
+
+	public ICompressionStrategy getCompressionStrategy() {
+		return compressionStrategy;
+	}
+
+	public void setCompressionStrategy(ICompressionStrategy compressionStrategy) {
+		this.compressionStrategy = compressionStrategy;
+	}
+
+	public void fill(boolean state) {
+		for (final boolean[] row : tiles)
+			Arrays.fill(row, state);
+		final byte tile = configuration.get(state ? 0b1111 : 0b0000);
+		for (final byte[] row : indices)
+			Arrays.fill(row, tile);
+	}
+
+	public boolean isOutOfBounds(final int x, final int y) {
+		return (x < 0 || y < 0 || x >= tilesX || y >= tilesY);
+	}
+
+	public boolean tileAt(final int x, final int y) {
+		if (isOutOfBounds(x, y))
+			return false;
+		return tiles[x][y];
+	}
+
+	public void tileAt(final int x, final int y, final boolean state) {
+		if (isOutOfBounds(x, y))
+			return;
+		tiles[x][y] = state;
+		for (final GridPoint2 neighbor : neighbors) {
+			final int nX = x + neighbor.x;
+			final int nY = y + neighbor.y;
+			if (isOutOfBounds(nX, nY))
+				continue;
+
+			int bitmask = 0;
+			bitmask |= tileAt(nX - neighbors[1].x, nY - neighbors[1].y) ? (1 << 3) : 0;
+			bitmask |= tileAt(nX - neighbors[0].x, nY - neighbors[0].y) ? (1 << 2) : 0;
+			bitmask |= tileAt(nX - neighbors[3].x, nY - neighbors[3].y) ? (1 << 1) : 0;
+			bitmask |= tileAt(nX - neighbors[2].x, nY - neighbors[2].y) ? (1) : 0;
+			indices[nX][nY] = configuration.get(bitmask);
+		}
+	}
+
+	/* May be called before rendering! */
+	public void setView(OrthographicCamera camera) {
+		float width = camera.viewportWidth * camera.zoom;
+		float height = camera.viewportHeight * camera.zoom;
+		float w = width * Math.abs(camera.up.y) + height * Math.abs(camera.up.x);
+		float h = height * Math.abs(camera.up.y) + width * Math.abs(camera.up.x);
+		viewBounds.set(camera.position.x - w / 2, camera.position.y - h / 2, w, h);
+	}
+
+	/* May be called before rendering! */
+	public void setView(float x, float y, float width, float height) {
+		viewBounds.set(x, y, width, height);
+	}
+
+	public void render(final Batch batch) {
+		if (texture == null)
+			return;
+
+		if (overlayed) {
+			overlayTexture.bind(1);
+			texture.bind(0);
+			overlayShaderProgram.bind();
+			overlayShaderProgram.setUniformi("u_overlay", 1);
+			overlayShaderProgram.setUniformi("u_texture", 0);
+			overlayShaderProgram.setUniformf("u_scale", overlayScale / unitScale);
+			batch.setShader(overlayShaderProgram);
+		}
+
+		renderStrategy.render(this, batch);
+
+		if (overlayed)
+			batch.setShader(null);
+	}
+
+	public enum RenderStrategy implements IRenderStrategy {
+
+		ALL_TILES_ALL_QUADS((byte) 0) {
+			@Override
+			public void render(TileLayer tileLayer, Batch batch) {
+				final float tileWidth = tileLayer.tileWidth * tileLayer.unitScale;
+				final float tileHeight = tileLayer.tileHeight * tileLayer.unitScale;
+				tileLayer.tilesRendered = 0;
+				tileLayer.quadsRendered = 0;
+				for (int x = 0; x < tileLayer.tilesX; x++) {
+					for (int y = 0; y < tileLayer.tilesY; y++) {
+						if (tileLayer.tiles[x][y])
+							tileLayer.tilesRendered++;
+						tileLayer.quadsRendered++;
+						batch.draw(tileLayer.tileSet[tileLayer.indices[x][y]],
+							(tileLayer.offsetX + x * tileLayer.tileWidth) * tileLayer.unitScale,
+							(tileLayer.offsetY + y * tileLayer.tileHeight) * tileLayer.unitScale,
+							tileWidth, tileHeight
+						);
+					}
+				}
+			}
+		},
+
+		ALL_TILES_VIEW_QUADS((byte) 1) {
+			@Override
+			public void render(TileLayer tileLayer, Batch batch) {
+				final float tileWidth = tileLayer.tileWidth * tileLayer.unitScale;
+				final float tileHeight = tileLayer.tileHeight * tileLayer.unitScale;
+				tileLayer.tilesRendered = 0;
+				tileLayer.quadsRendered = 0;
+				byte index;
+				for (int x = 0; x < tileLayer.tilesX; x++) {
+					for (int y = 0; y < tileLayer.tilesY; y++) {
+						if (tileLayer.tiles[x][y])
+							tileLayer.tilesRendered++;
+						index = tileLayer.indices[x][y];
+						if (index == zeroIndex)
+							continue;
+						tileLayer.quadsRendered++;
+						batch.draw(tileLayer.tileSet[index],
+							(tileLayer.offsetX + x * tileLayer.tileWidth) * tileLayer.unitScale,
+							(tileLayer.offsetY + y * tileLayer.tileHeight) * tileLayer.unitScale,
+							tileWidth, tileHeight
+						);
+					}
+				}
+			}
+		},
+
+		VIEW_TILES_ALL_QUADS((byte) 2) {
+			@Override
+			public void render(TileLayer tileLayer, Batch batch) {
+				final float tileWidth = tileLayer.tileWidth * tileLayer.unitScale;
+				final float tileHeight = tileLayer.tileHeight * tileLayer.unitScale;
+				int col1 = Math.max(0, (int) ((tileLayer.viewBounds.x - tileLayer.offsetX) / (tileWidth)));
+				int col2 = Math.min(tileLayer.tilesX, (int) ((tileLayer.viewBounds.x + tileLayer.viewBounds.width) / (tileWidth)) + 1);
+				int row1 = Math.max(0, (int) ((tileLayer.viewBounds.y - tileLayer.offsetY) / (tileHeight)));
+				int row2 = Math.min(tileLayer.tilesY, (int) ((tileLayer.viewBounds.y + tileLayer.viewBounds.height) / (tileHeight)) + 1);
+				tileLayer.tilesRendered = 0;
+				tileLayer.quadsRendered = 0;
+				for (int x = col1; x < col2; x++) {
+					for (int y = row1; y < row2; y++) {
+						if (tileLayer.tiles[x][y])
+							tileLayer.tilesRendered++;
+						tileLayer.quadsRendered++;
+						batch.draw(tileLayer.tileSet[tileLayer.indices[x][y]],
+							(tileLayer.offsetX + x * tileLayer.tileWidth) * tileLayer.unitScale,
+							(tileLayer.offsetY + y * tileLayer.tileHeight) * tileLayer.unitScale,
+							tileWidth, tileHeight
+						);
+					}
+				}
+			}
+		},
+
+		VIEW_TILES_VIEW_QUADS((byte) 3) {
+			@Override
+			public void render(TileLayer tileLayer, Batch batch) {
+				final float tileWidth = tileLayer.tileWidth * tileLayer.unitScale;
+				final float tileHeight = tileLayer.tileHeight * tileLayer.unitScale;
+				int col1 = Math.max(0, (int) ((tileLayer.viewBounds.x - tileLayer.offsetX) / (tileWidth)));
+				int col2 = Math.min(tileLayer.tilesX, (int) ((tileLayer.viewBounds.x + tileLayer.viewBounds.width) / (tileWidth)) + 1);
+				int row1 = Math.max(0, (int) ((tileLayer.viewBounds.y - tileLayer.offsetY) / (tileHeight)));
+				int row2 = Math.min(tileLayer.tilesY, (int) ((tileLayer.viewBounds.y + tileLayer.viewBounds.height) / (tileHeight)) + 1);
+				tileLayer.tilesRendered = 0;
+				tileLayer.quadsRendered = 0;
+				byte index;
+				for (int x = col1; x < col2; x++) {
+					for (int y = row1; y < row2; y++) {
+						if (tileLayer.tiles[x][y])
+							tileLayer.tilesRendered++;
+						index = tileLayer.indices[x][y];
+						if (index == zeroIndex)
+							continue;
+						tileLayer.quadsRendered++;
+						batch.draw(tileLayer.tileSet[index],
+							(tileLayer.offsetX + x * tileLayer.tileWidth) * tileLayer.unitScale,
+							(tileLayer.offsetY + y * tileLayer.tileHeight) * tileLayer.unitScale,
+							tileWidth, tileHeight
+						);
+					}
+				}
+			}
+		};
+
+		private final byte index;
+
+		RenderStrategy(byte index) {
+			this.index = index;
+		}
+
+		public static RenderStrategy fromIndex(byte b) {
+			if (b == 0)
+				return RenderStrategy.ALL_TILES_ALL_QUADS;
+			else if (b == 1)
+				return RenderStrategy.ALL_TILES_VIEW_QUADS;
+			else if (b == 2)
+				return RenderStrategy.VIEW_TILES_ALL_QUADS;
+			else if (b == 3)
+				return RenderStrategy.VIEW_TILES_VIEW_QUADS;
+			else
+				throw new IllegalArgumentException("Unknown render strategy: " + b);
+		}
+
+	}
+
+	public interface IRenderStrategy {
+
+		void render(TileLayer tileLayer, Batch batch);
+
+	}
+
+	public enum CompressionStrategy implements ICompressionStrategy {
+
+		BIT_COMPRESSED((byte) 0) {
+			@Override
+			public byte[] compress(boolean[][] tiles, int tilesX, int tilesY) {
+				int totalBits = tilesX * tilesY;
+				int totalBytes = (totalBits + 7) / 8;
+				byte[] bytes = new byte[totalBytes];
+
+				int bitIndex = 0;
+				for (int y = 0; y < tilesY; y++) {
+					for (boolean[] tile : tiles) {
+						if (tile[y])
+							bytes[bitIndex / 8] |= (byte) (1 << (bitIndex % 8));
+						bitIndex++;
+					}
+				}
+				return bytes;
+			}
+
+			@Override
+			public boolean[][] decompress(byte[] bytes, int tilesX, int tilesY) {
+				boolean[][] tiles = new boolean[tilesX][tilesY];
+
+				int bitIndex = 0;
+				for (int y = 0; y < tilesY; y++) {
+					for (int x = 0; x < tilesX; x++) {
+						tiles[x][y] = (bytes[bitIndex / 8] & (1 << (bitIndex % 8))) != 0;
+						bitIndex++;
+					}
+				}
+				return tiles;
+			}
+		},
+		SPARSE_COMPRESSED((byte) 1) {
+			@Override
+			public byte[] compress(boolean[][] tiles, int tilesX, int tilesY) throws IOException {
+				final ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+				final DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
+				for (int x = 0; x < tilesX; x++)
+					for (int y = 0; y < tilesY; y++) {
+						if (tiles[x][y]) {
+							dataOutputStream.writeShort(x);
+							dataOutputStream.writeShort(y);
+						}
+					}
+				final byte[] buffer = byteArrayOutputStream.toByteArray();
+				dataOutputStream.close();
+				return buffer;
+			}
+
+			@Override
+			public boolean[][] decompress(byte[] bytes, int tilesX, int tilesY) throws IOException {
+				final boolean[][] tiles = new boolean[tilesX][tilesY];
+				final ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(bytes);
+				final DataInputStream dataInputStream = new DataInputStream(byteArrayInputStream);
+				while (dataInputStream.available() > 0) {
+					int x = dataInputStream.readShort();
+					int y = dataInputStream.readShort();
+					tiles[x][y] = true;
+				}
+				return tiles;
+			}
+		},
+		RUN_LENGTH_COMPRESSED((byte) 2) {
+			@Override
+			public byte[] compress(boolean[][] tiles, int tilesX, int tilesY) throws IOException {
+				final ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+				final DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
+				boolean lastValue = tiles[0][0];
+				int count = 0;
+				for (int y = 0; y < tilesY; y++) {
+					for (int x = 0; x < tilesX; x++) {
+						if (tiles[x][y] == lastValue) {
+							count++;
+						} else {
+							dataOutputStream.writeBoolean(lastValue);
+							dataOutputStream.writeShort(count);
+							lastValue = tiles[x][y];
+							count = 1;
+						}
+					}
+				}
+				dataOutputStream.writeBoolean(lastValue);
+				dataOutputStream.writeShort(count);
+				return byteArrayOutputStream.toByteArray();
+			}
+
+			@Override
+			public boolean[][] decompress(byte[] bytes, int tilesX, int tilesY) throws IOException {
+				final boolean[][] tiles = new boolean[tilesX][tilesY];
+				final ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(bytes);
+				final DataInputStream dataInputStream = new DataInputStream(byteArrayInputStream);
+
+				int x = 0, y = 0;
+				while (dataInputStream.available() > 0) {
+					boolean value = dataInputStream.readBoolean();
+					int count = dataInputStream.readShort();
+					for (int i = 0; i < count; i++) {
+						tiles[x][y] = value;
+						x++;
+						if (x >= tilesX) {
+							x = 0;
+							y++;
+						}
+					}
+				}
+				return tiles;
+			}
+		};
+
+		private final byte index;
+
+		CompressionStrategy(byte index) {
+			this.index = index;
+		}
+
+		public static CompressionStrategy fromIndex(byte b) {
+			if (b == 0)
+				return CompressionStrategy.BIT_COMPRESSED;
+			else if (b == 1)
+				return CompressionStrategy.SPARSE_COMPRESSED;
+			else if (b == 2)
+				return CompressionStrategy.RUN_LENGTH_COMPRESSED;
+			else
+				throw new IllegalArgumentException("Unknown compression strategy: " + b);
+		}
+
+	}
+
+	public interface ICompressionStrategy {
+
+		byte[] compress(boolean[][] tiles, int tilesX, int tilesY) throws IOException;
+
+		boolean[][] decompress(byte[] bytes, int tilesX, int tilesY) throws IOException;
+
+	}
 
 }
